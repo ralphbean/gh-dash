@@ -87,8 +87,11 @@ func (m *Model) Update(msg tea.Msg) (section.Section, tea.Cmd) {
 			case "enter":
 				input := m.PromptConfirmationBox.Value()
 				action := m.GetPromptConfirmationAction()
-				if input == "Y" || input == "y" {
-					issue := m.GetCurrRow()
+				issue := m.GetCurrRow()
+				if action == "snooze" {
+					m.applySnooze(input, issue)
+					m.Table.SetRows(m.BuildRows())
+				} else if input == "Y" || input == "y" {
 					sid := tasks.SectionIdentifier{Id: m.Id, Type: SectionType}
 					switch action {
 					case "close":
@@ -261,9 +264,24 @@ func GetSectionColumns(
 	}
 }
 
+// visibleIssues returns m.Issues with snoozed issues filtered out. It's used
+// by both BuildRows and GetCurrRow so that the table's row index (which only
+// ever spans visible rows) maps consistently to the underlying data.
+func (m Model) visibleIssues() []data.IssueData {
+	snoozeStore := data.GetSnoozeStore()
+	visible := make([]data.IssueData, 0, len(m.Issues))
+	for _, issue := range m.Issues {
+		if snoozeStore.IsSnoozed(snoozeKey(&issue)) {
+			continue
+		}
+		visible = append(visible, issue)
+	}
+	return visible
+}
+
 func (m Model) BuildRows() []table.Row {
 	var rows []table.Row
-	for _, currIssue := range m.Issues {
+	for _, currIssue := range m.visibleIssues() {
 		issueModel := issuerow.Issue{Ctx: m.Ctx, Data: currIssue, ShowAuthorIcon: m.ShowAuthorIcon}
 		rows = append(rows, issueModel.ToTableRow())
 	}
@@ -281,10 +299,11 @@ func (m *Model) NumRows() int {
 
 func (m *Model) GetCurrRow() data.RowData {
 	idx := m.Table.GetCurrItem()
-	if idx < 0 || idx >= len(m.Issues) {
+	visible := m.visibleIssues()
+	if idx < 0 || idx >= len(visible) {
 		return nil
 	}
-	issue := m.Issues[idx]
+	issue := visible[idx]
 	return &issue
 }
 

@@ -6,17 +6,30 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dlvhdr/gh-dash/v4/internal/config"
 	"github.com/dlvhdr/gh-dash/v4/internal/data"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/prompt"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/prrow"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/section"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/context"
+	"github.com/dlvhdr/gh-dash/v4/internal/tui/theme"
 )
 
 // newTestModel creates a minimal Model with the prompt confirmation box
 // focused and a single PR row so that GetCurrRow returns non-nil.
 func newTestModel(action string) Model {
+	cfg, err := config.ParseConfig(config.Location{
+		ConfigFlag:       "../../../config/testdata/test-config.yml",
+		SkipGlobalConfig: true,
+	})
+	if err != nil {
+		panic(err)
+	}
+	thm := theme.ParseTheme(&cfg)
 	ctx := &context.ProgramContext{
+		Config: &cfg,
+		Theme:  thm,
+		Styles: context.InitStyles(thm),
 		StartTask: func(task context.Task) tea.Cmd {
 			return func() tea.Msg { return nil }
 		},
@@ -33,6 +46,7 @@ func newTestModel(action string) Model {
 		},
 	}
 	m.PromptConfirmationBox.Focus()
+	m.Table.UpdateProgramContext(ctx)
 	return m
 }
 

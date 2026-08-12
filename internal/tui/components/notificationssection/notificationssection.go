@@ -239,7 +239,10 @@ func (m *Model) Update(msg tea.Msg) (section.Section, tea.Cmd) {
 			case "enter":
 				input := m.PromptConfirmationBox.Value()
 				action := m.GetPromptConfirmationAction()
-				if input == "Y" || input == "y" {
+				if action == "snooze" {
+					m.applySnooze(input, m.GetCurrNotification())
+					m.Table.SetRows(m.BuildRows())
+				} else if input == "Y" || input == "y" {
 					switch action {
 					case "done":
 						cmd = m.markAsDone()
@@ -293,6 +296,13 @@ func (m *Model) Update(msg tea.Msg) (section.Section, tea.Cmd) {
 				m.Table.SetRows(m.BuildRows())
 			}
 			return m, nil
+
+		case key.Matches(msg, keys.NotificationKeys.Snooze):
+			if m.GetCurrRow() != nil {
+				m.SetPromptConfirmationAction("snooze")
+				cmd = m.SetIsPromptConfirmationShown(true)
+			}
+			return m, cmd
 
 		case key.Matches(msg, keys.NotificationKeys.SortByRepo):
 			m.toggleSortOrder()
@@ -619,6 +629,7 @@ func (m *Model) FetchNextPageSectionRows() []tea.Cmd {
 
 		// Initialize done store for filtering
 		doneStore := data.GetDoneStore()
+		snoozeStore := data.GetSnoozeStore()
 
 		// Track accumulated notifications across multiple pages.
 		// We may need to fetch additional pages if many notifications are filtered out
@@ -728,7 +739,8 @@ func (m *Model) FetchNextPageSectionRows() []tea.Cmd {
 			for _, n := range res.Notifications {
 				// Skip notifications marked as done (GitHub API still returns them with all=true)
 				// Check both persistent store and session state
-				if doneStore.IsDone(n.Id, n.UpdatedAt) || sessionMarkedDone[n.Id] {
+				if doneStore.IsDone(n.Id, n.UpdatedAt) || sessionMarkedDone[n.Id] ||
+					snoozeStore.IsSnoozed(snoozeKey(n.Id)) {
 					continue
 				}
 

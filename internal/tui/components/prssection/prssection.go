@@ -91,7 +91,10 @@ func (m *Model) Update(msg tea.Msg) (section.Section, tea.Cmd) {
 				action := m.GetPromptConfirmationAction()
 				pr := m.GetCurrRow()
 				sid := tasks.SectionIdentifier{Id: m.Id, Type: SectionType}
-				if input == "Y" || input == "y" {
+				if action == "snooze" {
+					m.applySnooze(input, pr)
+					m.Table.SetRows(m.BuildRows())
+				} else if input == "Y" || input == "y" {
 					switch action {
 					case "close":
 						cmd = tasks.ClosePR(m.Ctx, sid, pr)
@@ -403,10 +406,25 @@ func GetSectionColumns(
 	}
 }
 
+// visiblePRs returns m.Prs with snoozed PRs filtered out. It's used by both
+// BuildRows and GetCurrRow so that the table's row index (which only ever
+// spans visible rows) maps consistently to the underlying data.
+func (m Model) visiblePRs() []prrow.Data {
+	snoozeStore := data.GetSnoozeStore()
+	visible := make([]prrow.Data, 0, len(m.Prs))
+	for _, pr := range m.Prs {
+		if snoozeStore.IsSnoozed(snoozeKey(&pr)) {
+			continue
+		}
+		visible = append(visible, pr)
+	}
+	return visible
+}
+
 func (m Model) BuildRows() []table.Row {
 	var rows []table.Row
 	currItem := m.Table.GetCurrItem()
-	for i, currPr := range m.Prs {
+	for i, currPr := range m.visiblePRs() {
 		prModel := prrow.PullRequest{
 			Ctx:     m.Ctx,
 			Data:    &currPr,
@@ -438,10 +456,11 @@ type SectionPullRequestsFetchedMsg struct {
 
 func (m *Model) GetCurrRow() data.RowData {
 	idx := m.Table.GetCurrItem()
-	if idx < 0 || idx >= len(m.Prs) {
+	visible := m.visiblePRs()
+	if idx < 0 || idx >= len(visible) {
 		return nil
 	}
-	pr := m.Prs[idx]
+	pr := visible[idx]
 	return &pr
 }
 

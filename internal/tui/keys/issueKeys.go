@@ -19,6 +19,7 @@ type IssueKeyMap struct {
 	Reopen               key.Binding
 	ToggleSmartFiltering key.Binding
 	ViewPRs              key.Binding
+	Snooze               key.Binding
 }
 
 var IssueKeys = IssueKeyMap{
@@ -58,6 +59,10 @@ var IssueKeys = IssueKeyMap{
 		key.WithKeys("s"),
 		key.WithHelp("s", "switch to notifications"),
 	),
+	Snooze: key.NewBinding(
+		key.WithKeys("z"),
+		key.WithHelp("z", "snooze"),
+	),
 }
 
 func IssueFullHelp() []key.Binding {
@@ -71,6 +76,7 @@ func IssueFullHelp() []key.Binding {
 		IssueKeys.Reopen,
 		IssueKeys.ToggleSmartFiltering,
 		IssueKeys.ViewPRs,
+		IssueKeys.Snooze,
 	}
 }
 
@@ -117,6 +123,8 @@ func rebindIssueKeys(keys []config.Keybinding) error {
 			key = &IssueKeys.Reopen
 		case "viewPrs":
 			key = &IssueKeys.ViewPRs
+		case "snooze":
+			key = &IssueKeys.Snooze
 		default:
 			return fmt.Errorf("unknown built-in issue key: '%s'", issueKey.Builtin)
 		}

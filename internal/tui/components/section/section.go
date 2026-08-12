@@ -506,6 +506,13 @@ func (m *BaseModel) GetPromptConfirmation() string {
 			prompt = "Enter PR title: "
 		case m.PromptConfirmationAction == "done_all" && m.Ctx.View == config.NotificationsView:
 			prompt = "Are you sure you want to mark all as done? (y/N) "
+
+		case m.PromptConfirmationAction == "snooze":
+			var parts []string
+			for i, p := range m.Ctx.Config.Defaults.SnoozePresets {
+				parts = append(parts, fmt.Sprintf("[%d] %s", i+1, p.Label))
+			}
+			prompt = fmt.Sprintf("Snooze until: %s (Esc to cancel) ", strings.Join(parts, "  "))
 		}
 
 		m.PromptConfirmationBox.SetPrompt(prompt)

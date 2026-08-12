@@ -237,6 +237,39 @@ view when it first loads.
 
 By default, the dashboard displays the PRs view.
 
+### Snooze Presets (`snoozePresets`)
+
+| Type  | Default                                          |
+| :---- | :------------------------------------------------ |
+| Array | 10m, 1h, 4h, Tomorrow, This Friday, Next week      |
+
+This setting defines the list of presets offered when you [snooze] a PR, issue, or
+notification. Each preset has a `label` (shown in the prompt) and an `after` value, which is
+either a duration (e.g. `10m`, `1h`, `4h`) or one of the keywords `tomorrow`, `this <weekday>`,
+or `next week`.
+
+```yaml
+defaults:
+  snoozePresets:
+    - label: 10m
+      after: 10m
+    - label: 1h
+      after: 1h
+    - label: 4h
+      after: 4h
+    - label: Tomorrow
+      after: tomorrow
+    - label: This Friday
+      after: this friday
+    - label: Next week
+      after: next week
+```
+
+Snoozing hides the item until the computed wake-up time, at which point it reappears
+automatically. Snooze state is stored locally and isn't synced to GitHub.
+
+[snooze]: /getting-started/keybindings/selected-pr/
+
 ### PR Approval (`prApproveComment`)
 
 | Type   | Default |

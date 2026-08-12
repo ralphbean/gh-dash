@@ -22,6 +22,7 @@ type NotificationKeyMap struct {
 	SortByRepo           key.Binding
 	SwitchToPRs          key.Binding
 	ToggleSmartFiltering key.Binding
+	Snooze               key.Binding
 }
 
 var NotificationKeys = NotificationKeyMap{
@@ -73,6 +74,10 @@ var NotificationKeys = NotificationKeyMap{
 		key.WithKeys("t"),
 		key.WithHelp("t", "toggle smart filtering"),
 	),
+	Snooze: key.NewBinding(
+		key.WithKeys("z"),
+		key.WithHelp("z", "snooze"),
+	),
 }
 
 func NotificationFullHelp() []key.Binding {
@@ -89,6 +94,7 @@ func NotificationFullHelp() []key.Binding {
 		NotificationKeys.SortByRepo,
 		NotificationKeys.SwitchToPRs,
 		NotificationKeys.ToggleSmartFiltering,
+		NotificationKeys.Snooze,
 	}
 }
 
@@ -141,6 +147,8 @@ func rebindNotificationKeys(keys []config.Keybinding) error {
 			key = &NotificationKeys.SwitchToPRs
 		case "toggleSmartFiltering":
 			key = &NotificationKeys.ToggleSmartFiltering
+		case "snooze":
+			key = &NotificationKeys.Snooze
 		default:
 			return fmt.Errorf("unknown built-in notification key: '%s'", notifKey.Builtin)
 		}

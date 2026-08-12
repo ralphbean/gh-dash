@@ -183,16 +183,22 @@ type LayoutConfig struct {
 	Issues IssuesLayoutConfig `yaml:"issues,omitempty"`
 }
 
+type SnoozePreset struct {
+	Label string `yaml:"label"`
+	After string `yaml:"after"`
+}
+
 type Defaults struct {
-	Preview                PreviewConfig `yaml:"preview"`
-	PrsLimit               int           `yaml:"prsLimit"`
-	PrApproveComment       string        `yaml:"prApproveComment,omitempty"`
-	IssuesLimit            int           `yaml:"issuesLimit"`
-	NotificationsLimit     int           `yaml:"notificationsLimit"`
-	View                   ViewType      `yaml:"view"`
-	Layout                 LayoutConfig  `yaml:"layout,omitempty"`
-	RefetchIntervalMinutes int           `yaml:"refetchIntervalMinutes,omitempty"`
-	DateFormat             string        `yaml:"dateFormat,omitempty"`
+	Preview                PreviewConfig  `yaml:"preview"`
+	PrsLimit               int            `yaml:"prsLimit"`
+	PrApproveComment       string         `yaml:"prApproveComment,omitempty"`
+	IssuesLimit            int            `yaml:"issuesLimit"`
+	NotificationsLimit     int            `yaml:"notificationsLimit"`
+	View                   ViewType       `yaml:"view"`
+	Layout                 LayoutConfig   `yaml:"layout,omitempty"`
+	RefetchIntervalMinutes int            `yaml:"refetchIntervalMinutes,omitempty"`
+	DateFormat             string         `yaml:"dateFormat,omitempty"`
+	SnoozePresets          []SnoozePreset `yaml:"snoozePresets,omitempty"`
 }
 
 type RepoConfig struct {
@@ -358,6 +364,14 @@ func (parser ConfigParser) getDefaultConfig() Config {
 			NotificationsLimit:     20,
 			View:                   PRsView,
 			RefetchIntervalMinutes: 30,
+			SnoozePresets: []SnoozePreset{
+				{Label: "10m", After: "10m"},
+				{Label: "1h", After: "1h"},
+				{Label: "4h", After: "4h"},
+				{Label: "Tomorrow", After: "tomorrow"},
+				{Label: "This Friday", After: "this friday"},
+				{Label: "Next week", After: "next week"},
+			},
 			Layout: LayoutConfig{
 				Prs: PrsLayoutConfig{
 					UpdatedAt: ColumnConfig{

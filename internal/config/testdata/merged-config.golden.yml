@@ -79,6 +79,19 @@ defaults:
         width: 20
         hidden: true
   refetchIntervalMinutes: 10
+  snoozePresets:
+    - label: 10m
+      after: 10m
+    - label: 1h
+      after: 1h
+    - label: 4h
+      after: 4h
+    - label: Tomorrow
+      after: tomorrow
+    - label: This Friday
+      after: this friday
+    - label: Next week
+      after: next week
 keybindings:
   universal:
     - key: "n"

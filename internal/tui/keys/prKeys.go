@@ -29,6 +29,7 @@ type PRKeyMap struct {
 	ApproveWorkflows     key.Binding
 	ToggleSmartFiltering key.Binding
 	ViewIssues           key.Binding
+	Snooze               key.Binding
 }
 
 var PRKeys = PRKeyMap{
@@ -108,6 +109,10 @@ var PRKeys = PRKeyMap{
 		key.WithKeys("s"),
 		key.WithHelp("s", "switch to issues"),
 	),
+	Snooze: key.NewBinding(
+		key.WithKeys("z"),
+		key.WithHelp("z", "snooze"),
+	),
 }
 
 func PRFullHelp() []key.Binding {
@@ -130,6 +135,7 @@ func PRFullHelp() []key.Binding {
 		PRKeys.ApproveWorkflows,
 		PRKeys.ToggleSmartFiltering,
 		PRKeys.ViewIssues,
+		PRKeys.Snooze,
 	}
 }
 
@@ -196,6 +202,8 @@ func rebindPRKeys(keys []config.Keybinding) error {
 			key = &PRKeys.ViewIssues
 		case "summaryViewMore":
 			key = &PRKeys.SummaryViewMore
+		case "snooze":
+			key = &PRKeys.Snooze
 		default:
 			return fmt.Errorf("unknown built-in pr key: '%s'", prKey.Builtin)
 		}

@@ -461,6 +461,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, cmd
 
+			case key.Matches(msg, keys.PRKeys.Snooze):
+				if currRowData != nil {
+					cmd = m.promptConfirmation(currSection, "snooze")
+				}
+				return m, cmd
+
 			case key.Matches(msg, keys.PRKeys.ViewIssues):
 				cmds = append(cmds, m.switchSelectedView())
 
@@ -502,6 +508,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case key.Matches(msg, keys.IssueKeys.Reopen):
 				if currRowData != nil {
 					cmd = m.promptConfirmation(currSection, "reopen")
+				}
+				return m, cmd
+
+			case key.Matches(msg, keys.IssueKeys.Snooze):
+				if currRowData != nil {
+					cmd = m.promptConfirmation(currSection, "snooze")
 				}
 				return m, cmd
 
