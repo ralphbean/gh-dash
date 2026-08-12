@@ -92,7 +92,14 @@ func (m *Model) Update(msg tea.Msg) (section.Section, tea.Cmd) {
 				pr := m.GetCurrRow()
 				sid := tasks.SectionIdentifier{Id: m.Id, Type: SectionType}
 				if action == "snooze" {
-					m.applySnooze(input, pr)
+					if m.applySnooze(input, pr) {
+						cmd = tasks.SnoozeFeedback(
+							m.Ctx,
+							sid,
+							snoozeKey(pr),
+							fmt.Sprintf("PR #%d", pr.GetNumber()),
+						)
+					}
 					m.Table.SetRows(m.BuildRows())
 				} else if input == "Y" || input == "y" {
 					switch action {
@@ -444,7 +451,7 @@ func (m Model) BuildRows() []table.Row {
 }
 
 func (m *Model) NumRows() int {
-	return len(m.Prs)
+	return len(m.visiblePRs())
 }
 
 type SectionPullRequestsFetchedMsg struct {
@@ -609,8 +616,17 @@ func (m Model) GetItemPluralForm() string {
 	return "PRs"
 }
 
+// visibleTotalCount adjusts TotalCount by the number of currently-snoozed
+// PRs among the fetched rows, so the tab badge and pager reflect what's
+// actually visible. It self-corrects as snoozes expire since visiblePRs()
+// re-evaluates time.Now() on every call.
+func (m Model) visibleTotalCount() int {
+	numSnoozed := len(m.Prs) - len(m.visiblePRs())
+	return utils.Max(0, m.TotalCount-numSnoozed)
+}
+
 func (m Model) GetTotalCount() int {
-	return m.TotalCount
+	return m.visibleTotalCount()
 }
 
 func (m *Model) SetIsLoading(val bool) {
@@ -626,14 +642,15 @@ func (m Model) GetPagerContent() string {
 	} else {
 		timeElapsed = fmt.Sprintf("~%v ago", timeElapsed)
 	}
-	if m.TotalCount > 0 {
+	totalCount := m.visibleTotalCount()
+	if totalCount > 0 {
 		pagerContent = fmt.Sprintf(
 			"%v Updated %v • %v %v/%v (fetched %v)",
 			constants.WaitingIcon,
 			timeElapsed,
 			m.SingularForm,
 			m.Table.GetCurrItem()+1,
-			m.TotalCount,
+			totalCount,
 			len(m.Table.Rows),
 		)
 	}

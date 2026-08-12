@@ -14,16 +14,6 @@ import (
 // (tomorrow, this <weekday>, next week), matching Gmail's own defaults.
 const snoozeMorningHour = 8
 
-var weekdayNames = map[string]time.Weekday{
-	"sunday":    time.Sunday,
-	"monday":    time.Monday,
-	"tuesday":   time.Tuesday,
-	"wednesday": time.Wednesday,
-	"thursday":  time.Thursday,
-	"friday":    time.Friday,
-	"saturday":  time.Saturday,
-}
-
 // ComputeWakeTime computes the time at which a snoozed item should reappear,
 // given a preset string and the current time.
 //
@@ -37,10 +27,10 @@ func ComputeWakeTime(preset string, now time.Time) (time.Time, error) {
 	case lower == "tomorrow":
 		return atMorning(now.AddDate(0, 0, 1)), nil
 	case lower == "next week":
-		return nextOccurrenceOf(now, time.Monday), nil
+		return nextOccurrenceOf(now, time.Monday, true), nil
 	case strings.HasPrefix(lower, "this "):
-		if wd, ok := weekdayNames[strings.TrimPrefix(lower, "this ")]; ok {
-			return nextOccurrenceOf(now, wd), nil
+		if wd, ok := utils.SnoozeWeekdayNames[strings.TrimPrefix(lower, "this ")]; ok {
+			return nextOccurrenceOf(now, wd, false), nil
 		}
 	}
 
@@ -79,18 +69,34 @@ func ResolveSnoozePreset(
 	return wakeAt, true
 }
 
+// ApplySnoozePreset parses input as a 1-based index into presets and, if
+// valid, records the computed wake-at time for key in the snooze store.
+// Returns false, with no effect on the store, for invalid input (bad index,
+// non-numeric, unrecognized preset).
+func ApplySnoozePreset(input, key string, presets []config.SnoozePreset) bool {
+	wakeAt, ok := ResolveSnoozePreset(input, presets, time.Now())
+	if !ok {
+		return false
+	}
+
+	GetSnoozeStore().Snooze(key, wakeAt)
+	return true
+}
+
 // atMorning returns t with its time-of-day set to snoozeMorningHour:00:00.
 func atMorning(t time.Time) time.Time {
 	return time.Date(t.Year(), t.Month(), t.Day(), snoozeMorningHour, 0, 0, 0, t.Location())
 }
 
 // nextOccurrenceOf returns the next occurrence of the given weekday at
-// snoozeMorningHour, at least one day out. If now falls on the target
-// weekday, it rolls to next week's occurrence rather than possibly returning
-// a time already in the past today.
-func nextOccurrenceOf(now time.Time, target time.Weekday) time.Time {
+// snoozeMorningHour. If now falls on the target weekday, alwaysSkipToday
+// controls the behavior: "next week" always rolls to next week's occurrence
+// (alwaysSkipToday=true), while "this <weekday>" only rolls forward if
+// snoozeMorningHour has already passed today - otherwise it resolves to
+// later today.
+func nextOccurrenceOf(now time.Time, target time.Weekday, alwaysSkipToday bool) time.Time {
 	daysUntil := (int(target) - int(now.Weekday()) + 7) % 7
-	if daysUntil == 0 {
+	if daysUntil == 0 && (alwaysSkipToday || !now.Before(atMorning(now))) {
 		daysUntil = 7
 	}
 	return atMorning(now.AddDate(0, 0, daysUntil))

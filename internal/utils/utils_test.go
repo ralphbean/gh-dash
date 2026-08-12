@@ -7,6 +7,29 @@ import (
 	"charm.land/lipgloss/v2/compat"
 )
 
+func TestIsValidSnoozePreset(t *testing.T) {
+	valid := []string{
+		"10m", "1h", "4h", "-2w", "3Y4M5d",
+		"tomorrow", "Tomorrow", "TOMORROW",
+		"next week", "Next Week",
+		"this friday", "This Monday", "this SUNDAY",
+	}
+	for _, v := range valid {
+		if !IsValidSnoozePreset(v) {
+			t.Errorf("expected %q to be a valid snooze preset", v)
+		}
+	}
+
+	invalid := []string{
+		"", "bogus", "this someday", "this", "whenever",
+	}
+	for _, v := range invalid {
+		if IsValidSnoozePreset(v) {
+			t.Errorf("expected %q to be an invalid snooze preset", v)
+		}
+	}
+}
+
 func TestGetStylePrefix(t *testing.T) {
 	tests := []struct {
 		name     string

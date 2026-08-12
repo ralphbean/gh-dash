@@ -1,8 +1,12 @@
 package data
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/dlvhdr/gh-dash/v4/internal/config"
 )
@@ -68,6 +72,18 @@ func TestComputeWakeTime(t *testing.T) {
 		}
 	})
 
+	t.Run("this friday when today is friday before cutoff resolves to today", func(t *testing.T) {
+		now := mustDate(t, "2024-01-12 07:00") // Friday, before 8am
+		got, err := ComputeWakeTime("this friday", now)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		want := mustDate(t, "2024-01-12 08:00")
+		if !got.Equal(want) {
+			t.Errorf("got %v, want %v", got, want)
+		}
+	})
+
 	t.Run("this friday when today is friday rolls to next week", func(t *testing.T) {
 		now := mustDate(t, "2024-01-12 09:00") // Friday, already past 8am
 		got, err := ComputeWakeTime("this friday", now)
@@ -121,6 +137,38 @@ func TestComputeWakeTime(t *testing.T) {
 		if _, err := ComputeWakeTime("bogus", now); err == nil {
 			t.Error("expected an error for an unrecognized preset")
 		}
+	})
+}
+
+func withTestSnoozeStore(t *testing.T) *SnoozeStore {
+	t.Helper()
+	tempDir, err := os.MkdirTemp("", "gh-dash-snooze-test")
+	require.NoError(t, err)
+	t.Cleanup(func() { os.RemoveAll(tempDir) })
+
+	store := NewSnoozeStoreForTesting(filepath.Join(tempDir, "snoozed.json"))
+	restore := OverrideSnoozeStoreForTesting(store)
+	t.Cleanup(restore)
+	return store
+}
+
+func TestApplySnoozePreset(t *testing.T) {
+	presets := []config.SnoozePreset{
+		{Label: "10m", After: "10m"},
+	}
+
+	t.Run("valid index snoozes the key and reports applied", func(t *testing.T) {
+		withTestSnoozeStore(t)
+		applied := ApplySnoozePreset("1", "some-key", presets)
+		require.True(t, applied)
+		require.True(t, GetSnoozeStore().IsSnoozed("some-key"))
+	})
+
+	t.Run("invalid index does not snooze and reports not applied", func(t *testing.T) {
+		withTestSnoozeStore(t)
+		applied := ApplySnoozePreset("99", "some-key", presets)
+		require.False(t, applied)
+		require.False(t, GetSnoozeStore().IsSnoozed("some-key"))
 	})
 }
 

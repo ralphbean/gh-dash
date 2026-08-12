@@ -17,6 +17,7 @@ import (
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/notificationrow"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/section"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/table"
+	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/tasks"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/constants"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/context"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/keys"
@@ -240,7 +241,16 @@ func (m *Model) Update(msg tea.Msg) (section.Section, tea.Cmd) {
 				input := m.PromptConfirmationBox.Value()
 				action := m.GetPromptConfirmationAction()
 				if action == "snooze" {
-					m.applySnooze(input, m.GetCurrNotification())
+					notification := m.GetCurrNotification()
+					if m.applySnooze(input, notification) {
+						sid := tasks.SectionIdentifier{Id: m.Id, Type: SectionType}
+						cmd = tasks.SnoozeFeedback(
+							m.Ctx,
+							sid,
+							snoozeKey(notification.GetId()),
+							notification.GetTitle(),
+						)
+					}
 					m.Table.SetRows(m.BuildRows())
 				} else if input == "Y" || input == "y" {
 					switch action {

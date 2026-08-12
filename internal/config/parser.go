@@ -185,7 +185,7 @@ type LayoutConfig struct {
 
 type SnoozePreset struct {
 	Label string `yaml:"label"`
-	After string `yaml:"after"`
+	After string `yaml:"after" validate:"snoozepreset"`
 }
 
 type Defaults struct {
@@ -817,6 +817,10 @@ func validateColor(fl validator.FieldLevel) bool {
 	return err == nil && n >= 0 && n <= 255
 }
 
+func validateSnoozePreset(fl validator.FieldLevel) bool {
+	return utils.IsValidSnoozePreset(fl.Field().String())
+}
+
 func initParser() ConfigParser {
 	validate = validator.New()
 
@@ -829,6 +833,7 @@ func initParser() ConfigParser {
 	})
 
 	validate.RegisterValidation("color", validateColor)
+	validate.RegisterValidation("snoozepreset", validateSnoozePreset)
 
 	return ConfigParser{
 		k: koanf.NewWithConf(conf),

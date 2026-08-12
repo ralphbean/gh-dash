@@ -57,6 +57,7 @@ func NewModel(
 func (m *Model) SetNumItems(numItems int) {
 	m.NumCurrentItems = numItems
 	m.bottomBoundId = utils.Min(m.NumCurrentItems-1, m.getNumPrsPerPage()-1)
+	m.currId = utils.Max(0, utils.Min(m.currId, m.NumCurrentItems-1))
 }
 
 func (m *Model) SetTotalItems(total int) {

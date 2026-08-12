@@ -12,9 +12,28 @@ import (
 	"github.com/dlvhdr/gh-dash/v4/internal/config"
 	"github.com/dlvhdr/gh-dash/v4/internal/data"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/notificationrow"
+	"github.com/dlvhdr/gh-dash/v4/internal/tui/constants"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/context"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/theme"
 )
+
+// collectMsgs executes cmd, flattening any tea.BatchMsg it produces into the
+// individual tea.Msg values that would ultimately be dispatched.
+func collectMsgs(t *testing.T, cmd tea.Cmd) []tea.Msg {
+	t.Helper()
+	if cmd == nil {
+		return nil
+	}
+	msg := cmd()
+	if batch, ok := msg.(tea.BatchMsg); ok {
+		var msgs []tea.Msg
+		for _, c := range batch {
+			msgs = append(msgs, collectMsgs(t, c)...)
+		}
+		return msgs
+	}
+	return []tea.Msg{msg}
+}
 
 func withTestSnoozeStore(t *testing.T) *data.SnoozeStore {
 	t.Helper()
@@ -73,6 +92,44 @@ func TestApplySnooze_ValidPresetSnoozesNotification(t *testing.T) {
 
 	require.True(t, data.GetSnoozeStore().IsSnoozed("notification:notif-A"),
 		"notification should be snoozed after confirming preset 1")
+}
+
+func TestApplySnooze_FiresSnoozeFeedback(t *testing.T) {
+	withTestSnoozeStore(t)
+
+	m := newTestModel(t, "snooze")
+	m.Ctx.Config.Defaults.SnoozePresets = []config.SnoozePreset{{Label: "10m", After: "10m"}}
+	m.PromptConfirmationBox.SetValue("1")
+
+	msg := tea.KeyPressMsg{Code: tea.KeyEnter}
+	_, cmd := m.Update(msg)
+
+	var found bool
+	for _, msg := range collectMsgs(t, cmd) {
+		if finished, ok := msg.(constants.TaskFinishedMsg); ok {
+			found = true
+			require.Equal(t, m.Id, finished.SectionId)
+			require.Equal(t, SectionType, finished.SectionType)
+		}
+	}
+	require.True(t, found, "confirming a snooze should surface footer feedback")
+}
+
+func TestApplySnooze_InvalidIndexDoesNotFireSnoozeFeedback(t *testing.T) {
+	withTestSnoozeStore(t)
+
+	m := newTestModel(t, "snooze")
+	m.Ctx.Config.Defaults.SnoozePresets = []config.SnoozePreset{{Label: "10m", After: "10m"}}
+	m.PromptConfirmationBox.SetValue("99")
+
+	msg := tea.KeyPressMsg{Code: tea.KeyEnter}
+	_, cmd := m.Update(msg)
+
+	for _, msg := range collectMsgs(t, cmd) {
+		if _, ok := msg.(constants.TaskFinishedMsg); ok {
+			t.Fatal("an invalid snooze should not surface footer feedback")
+		}
+	}
 }
 
 func TestApplySnooze_InvalidIndexIsIgnored(t *testing.T) {

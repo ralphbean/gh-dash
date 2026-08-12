@@ -46,6 +46,44 @@ func (or *TemplateRegistry) RegisterAliases(aliasMap sprout.FunctionAliasMap) er
 	return nil
 }
 
+// SnoozeWeekdayNames maps lowercase weekday names to time.Weekday, for use
+// in "this <weekday>" snooze presets.
+var SnoozeWeekdayNames = map[string]time.Weekday{
+	"sunday":    time.Sunday,
+	"monday":    time.Monday,
+	"tuesday":   time.Tuesday,
+	"wednesday": time.Wednesday,
+	"thursday":  time.Thursday,
+	"friday":    time.Friday,
+	"saturday":  time.Saturday,
+}
+
+// IsValidSnoozePreset reports whether s is a recognized snooze preset:
+// either a duration string or one of the keyword presets ("tomorrow",
+// "next week", "this <weekday>").
+func IsValidSnoozePreset(s string) bool {
+	lower := strings.ToLower(strings.TrimSpace(s))
+
+	switch {
+	case lower == "tomorrow", lower == "next week":
+		return true
+	case strings.HasPrefix(lower, "this "):
+		_, ok := SnoozeWeekdayNames[strings.TrimPrefix(lower, "this ")]
+		return ok
+	}
+
+	// ParseDuration returns a zero duration (and no error) for any string
+	// with no digits at all, so only attempt it for strings that could
+	// plausibly be a duration - otherwise every unrecognized keyword would
+	// be misreported as valid.
+	if strings.ContainsAny(s, "0123456789") {
+		_, err := ParseDuration(s)
+		return err == nil
+	}
+
+	return false
+}
+
 // ParseDuration parses a duration string.
 // examples: "10d", "-1.5w" or "3Y4M5d".
 // Add time units are "d"="D", "w"="W", "mo=M", "y"="Y".

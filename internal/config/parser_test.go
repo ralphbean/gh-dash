@@ -223,6 +223,27 @@ func setXDGConfigHomeEnvVar(t *testing.T, dir string) func() {
 	}
 }
 
+func TestValidateSnoozePreset(t *testing.T) {
+	// initParser registers the custom "snoozepreset" validator
+	initParser()
+
+	type testPreset struct {
+		After string `validate:"snoozepreset"`
+	}
+
+	valid := []string{"10m", "1h", "4h", "tomorrow", "this friday", "next week"}
+	for _, v := range valid {
+		err := validate.Struct(testPreset{After: v})
+		assert.NoErrorf(t, err, "expected %q to be valid", v)
+	}
+
+	invalid := []string{"", "bogus", "this someday"}
+	for _, v := range invalid {
+		err := validate.Struct(testPreset{After: v})
+		assert.Errorf(t, err, "expected %q to be invalid", v)
+	}
+}
+
 func TestValidateColor(t *testing.T) {
 	// initParser registers the custom "color" validator
 	initParser()

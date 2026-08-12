@@ -129,3 +129,34 @@ func TestNextItemAtLastItem(t *testing.T) {
 		t.Errorf("expected currId=9, got %d", m.GetCurrItem())
 	}
 }
+
+func TestSetNumItemsClampsCurrItem(t *testing.T) {
+	// Simulates snoozing/removing the currently selected bottom row: the
+	// list shrinks out from under the cursor, which must be clamped back
+	// into range rather than left pointing past the end.
+	m := newTestModel(testModelOpts{numItems: 10, viewportHeight: 5, itemHeight: 1})
+
+	for range 9 {
+		m.NextItem()
+	}
+	if m.GetCurrItem() != 9 {
+		t.Fatalf("expected currId=9, got %d", m.GetCurrItem())
+	}
+
+	m.SetNumItems(9)
+
+	if m.GetCurrItem() != 8 {
+		t.Errorf("expected currId to be clamped to 8, got %d", m.GetCurrItem())
+	}
+}
+
+func TestSetNumItemsClampsCurrItemToZeroWhenEmpty(t *testing.T) {
+	m := newTestModel(testModelOpts{numItems: 3, viewportHeight: 5, itemHeight: 1})
+
+	m.NextItem()
+	m.SetNumItems(0)
+
+	if m.GetCurrItem() != 0 {
+		t.Errorf("expected currId=0 when list is empty, got %d", m.GetCurrItem())
+	}
+}

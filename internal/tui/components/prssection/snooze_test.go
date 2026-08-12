@@ -12,7 +12,26 @@ import (
 	"github.com/dlvhdr/gh-dash/v4/internal/config"
 	"github.com/dlvhdr/gh-dash/v4/internal/data"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/prrow"
+	"github.com/dlvhdr/gh-dash/v4/internal/tui/constants"
 )
+
+// collectMsgs executes cmd, flattening any tea.BatchMsg it produces into the
+// individual tea.Msg values that would ultimately be dispatched.
+func collectMsgs(t *testing.T, cmd tea.Cmd) []tea.Msg {
+	t.Helper()
+	if cmd == nil {
+		return nil
+	}
+	msg := cmd()
+	if batch, ok := msg.(tea.BatchMsg); ok {
+		var msgs []tea.Msg
+		for _, c := range batch {
+			msgs = append(msgs, collectMsgs(t, c)...)
+		}
+		return msgs
+	}
+	return []tea.Msg{msg}
+}
 
 func withTestSnoozeStore(t *testing.T) *data.SnoozeStore {
 	t.Helper()
@@ -38,6 +57,44 @@ func TestApplySnooze_ValidPresetSnoozesPR(t *testing.T) {
 
 	require.True(t, data.GetSnoozeStore().IsSnoozed("pr:#42"),
 		"PR should be snoozed after confirming preset 1")
+}
+
+func TestApplySnooze_FiresSnoozeFeedback(t *testing.T) {
+	withTestSnoozeStore(t)
+
+	m := newTestModel("snooze")
+	m.Ctx.Config.Defaults.SnoozePresets = []config.SnoozePreset{{Label: "10m", After: "10m"}}
+	m.PromptConfirmationBox.SetValue("1")
+
+	msg := tea.KeyPressMsg{Code: tea.KeyEnter}
+	_, cmd := m.Update(msg)
+
+	var found bool
+	for _, msg := range collectMsgs(t, cmd) {
+		if finished, ok := msg.(constants.TaskFinishedMsg); ok {
+			found = true
+			require.Equal(t, m.Id, finished.SectionId)
+			require.Equal(t, SectionType, finished.SectionType)
+		}
+	}
+	require.True(t, found, "confirming a snooze should surface footer feedback")
+}
+
+func TestApplySnooze_InvalidIndexDoesNotFireSnoozeFeedback(t *testing.T) {
+	withTestSnoozeStore(t)
+
+	m := newTestModel("snooze")
+	m.Ctx.Config.Defaults.SnoozePresets = []config.SnoozePreset{{Label: "10m", After: "10m"}}
+	m.PromptConfirmationBox.SetValue("99")
+
+	msg := tea.KeyPressMsg{Code: tea.KeyEnter}
+	_, cmd := m.Update(msg)
+
+	for _, msg := range collectMsgs(t, cmd) {
+		if _, ok := msg.(constants.TaskFinishedMsg); ok {
+			t.Fatal("an invalid snooze should not surface footer feedback")
+		}
+	}
 }
 
 func TestApplySnooze_InvalidIndexIsIgnored(t *testing.T) {
@@ -86,6 +143,47 @@ func TestBuildRows_FiltersSnoozedPRs(t *testing.T) {
 
 	rows := m.BuildRows()
 	require.Len(t, rows, 1, "snoozed PR should be filtered out of BuildRows")
+}
+
+func TestNumRows_ExcludesSnoozedPRs(t *testing.T) {
+	store := withTestSnoozeStore(t)
+	store.Snooze("pr:owner/repo#1", time.Now().Add(time.Hour))
+
+	m := newTestModel("")
+	m.Prs = []prrow.Data{
+		{Primary: &data.PullRequestData{
+			Number:     1,
+			Repository: data.Repository{NameWithOwner: "owner/repo"},
+		}},
+		{Primary: &data.PullRequestData{
+			Number:     2,
+			Repository: data.Repository{NameWithOwner: "owner/repo"},
+		}},
+	}
+
+	require.Equal(t, 1, m.NumRows(),
+		"NumRows should exclude snoozed PRs so pagination triggers correctly")
+}
+
+func TestGetTotalCount_AdjustsForSnoozedPRs(t *testing.T) {
+	store := withTestSnoozeStore(t)
+	store.Snooze("pr:owner/repo#1", time.Now().Add(time.Hour))
+
+	m := newTestModel("")
+	m.Prs = []prrow.Data{
+		{Primary: &data.PullRequestData{
+			Number:     1,
+			Repository: data.Repository{NameWithOwner: "owner/repo"},
+		}},
+		{Primary: &data.PullRequestData{
+			Number:     2,
+			Repository: data.Repository{NameWithOwner: "owner/repo"},
+		}},
+	}
+	m.TotalCount = 2
+
+	require.Equal(t, 1, m.GetTotalCount(),
+		"GetTotalCount should exclude snoozed PRs so the tab badge matches visible rows")
 }
 
 func TestGetCurrRow_IndexesIntoVisiblePRsOnly(t *testing.T) {

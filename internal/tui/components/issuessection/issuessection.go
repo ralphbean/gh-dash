@@ -88,11 +88,18 @@ func (m *Model) Update(msg tea.Msg) (section.Section, tea.Cmd) {
 				input := m.PromptConfirmationBox.Value()
 				action := m.GetPromptConfirmationAction()
 				issue := m.GetCurrRow()
+				sid := tasks.SectionIdentifier{Id: m.Id, Type: SectionType}
 				if action == "snooze" {
-					m.applySnooze(input, issue)
+					if m.applySnooze(input, issue) {
+						cmd = tasks.SnoozeFeedback(
+							m.Ctx,
+							sid,
+							snoozeKey(issue),
+							fmt.Sprintf("Issue #%d", issue.GetNumber()),
+						)
+					}
 					m.Table.SetRows(m.BuildRows())
 				} else if input == "Y" || input == "y" {
-					sid := tasks.SectionIdentifier{Id: m.Id, Type: SectionType}
 					switch action {
 					case "close":
 						cmd = tasks.CloseIssue(m.Ctx, sid, issue)
@@ -294,7 +301,7 @@ func (m Model) BuildRows() []table.Row {
 }
 
 func (m *Model) NumRows() int {
-	return len(m.Issues)
+	return len(m.visibleIssues())
 }
 
 func (m *Model) GetCurrRow() data.RowData {
@@ -446,8 +453,17 @@ func (m Model) GetItemPluralForm() string {
 	return "Issues"
 }
 
+// visibleTotalCount adjusts TotalCount by the number of currently-snoozed
+// issues among the fetched rows, so the tab badge and pager reflect what's
+// actually visible. It self-corrects as snoozes expire since
+// visibleIssues() re-evaluates time.Now() on every call.
+func (m Model) visibleTotalCount() int {
+	numSnoozed := len(m.Issues) - len(m.visibleIssues())
+	return utils.Max(0, m.TotalCount-numSnoozed)
+}
+
 func (m Model) GetTotalCount() int {
-	return m.TotalCount
+	return m.visibleTotalCount()
 }
 
 func (m *Model) GetIsLoading() bool {
@@ -461,14 +477,15 @@ func (m *Model) SetIsLoading(val bool) {
 
 func (m Model) GetPagerContent() string {
 	pagerContent := ""
-	if m.TotalCount > 0 {
+	totalCount := m.visibleTotalCount()
+	if totalCount > 0 {
 		pagerContent = fmt.Sprintf(
 			"%v %v • %v %v/%v • Fetched %v",
 			constants.WaitingIcon,
 			m.LastUpdated().Format("01/02 15:04:05"),
 			m.SingularForm,
 			m.Table.GetCurrItem()+1,
-			m.TotalCount,
+			totalCount,
 			len(m.Table.Rows),
 		)
 	}
