@@ -240,3 +240,25 @@ func TestViewThreadTriage_EmptyStateWhenQueueIsEmpty(t *testing.T) {
 
 	require.Contains(t, view, "No unresolved review threads.")
 }
+
+func TestViewThreadTriage_OutdatedIndicator(t *testing.T) {
+	m := newTestModelForTriage(t)
+	withTriageThreads(&m, []data.ReviewThreadWithComments{
+		{Id: "t1", Path: "a.go", Line: 1, IsOutdated: true},
+	})
+
+	view := m.View()
+
+	require.Contains(t, view, "OUTDATED")
+}
+
+func TestViewThreadTriage_NoOutdatedIndicatorWhenNotOutdated(t *testing.T) {
+	m := newTestModelForTriage(t)
+	withTriageThreads(&m, []data.ReviewThreadWithComments{
+		{Id: "t1", Path: "a.go", Line: 1, IsOutdated: false},
+	})
+
+	view := m.View()
+
+	require.NotContains(t, view, "OUTDATED")
+}

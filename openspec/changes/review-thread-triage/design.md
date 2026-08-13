@@ -313,6 +313,15 @@ component-owned help source would split "what help is shown right now"
 across two places for no benefit over extending the existing
 package-level-flag pattern already established for notifications.
 
+### 8. Outdated-hunk indicator reuses the already-fetched `IsOutdated` field
+`data.ReviewThreadWithComments.IsOutdated` is already populated by both
+the enrichment query and `FetchReviewThreads` (`internal/data/prapi.go`)
+but currently unused by triage rendering. `renderThreadTriageHeader`
+appends a bold badge (e.g. "OUTDATED") styled with the theme's existing
+`WarningText` color (already used elsewhere in `prview` - see
+`files.go`'s conflict/warning indicators) when `thread.IsOutdated` is
+true. No new GraphQL fields or query changes are needed.
+
 ## Risks / Trade-offs
 
 - **[Risk]** Reusing `c` (Comment) and `r` (Refresh) with different

@@ -62,6 +62,12 @@ rendered the same way comment bodies are rendered elsewhere in the app.
   line-scroll and jump-to-top/bottom keys used elsewhere in the details
   view, without changing which thread is current
 
+#### Scenario: Thread's diff hunk is outdated
+- **WHEN** the triage workflow displays a thread whose anchoring diff hunk
+  is outdated relative to the pull request's current contents
+- **THEN** the system SHALL show a prominent indicator that the hunk is
+  outdated, visually distinct from the thread's normal file/line header
+
 ### Requirement: Moving between threads without changing resolution state
 The system SHALL let the user move to the next or previous thread in the
 queue without resolving, replying to, or otherwise altering the current

@@ -97,6 +97,9 @@
 - [x] 5.4 Confirm `getIndentedContentWidth()`-based width is used
       throughout (no hard-coded widths), consistent with the existing
       full-window details-view rendering.
+- [x] 5.5 Render an "outdated" indicator in `renderThreadTriageHeader`
+      when `thread.IsOutdated` is true, styled with `Theme.WarningText`,
+      per design.md Decision 8.
 
 ## 6. Keybindings and routing in `ui.go`
 
@@ -155,6 +158,8 @@
       when `m.pr.Data.IsEnriched` is already true.
 - [x] 7.8 `prview` tests: empty queue on entry shows the empty state and
       stays in triage until `esc`.
+- [x] 7.9 `prview` tests: outdated indicator renders when `IsOutdated` is
+      true and is absent when false.
 
 ## 8. Docs
 
