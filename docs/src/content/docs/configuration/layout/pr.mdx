@@ -22,6 +22,7 @@ Column headings have their color defined by the [`theme.colors.text.primary`] se
 
 By default, PR views display the following columns in the order they're listed:
 
+1. [`star`] with a width of 2 columns.
 1. [`updatedAt`] with a width of 7 columns.
 1. [`state`] with a width of 3 columns.
 1. [`repo`] with a width of 15 columns.
@@ -42,6 +43,7 @@ By default, PR views display the following columns in the order they're listed:
 
 </Aside>
       
+[`star`]:         #pr-star-column
 [`updatedAt`]:    #pr-updated-at-column
 [`state`]:        #pr-updated-at-column
 [`repo`]:         #pr-repo-column
@@ -54,6 +56,8 @@ By default, PR views display the following columns in the order they're listed:
 [`lines`]:        #pr-lines-column
 
 ```yaml
+star:
+  width: 2
 updatedAt:
   width: 7
 repo:
@@ -74,6 +78,18 @@ base:
 lines:
   width: 16
 ```
+
+## PR Star Column
+
+| Property | Type | Default                                            |
+| :------- | :--- | :------------------------------------------------- |
+| `star`   | yaml | <Code code={`width: 2`} lang="yaml" frame="none"/> |
+
+This column displays a star icon for PRs you've starred, and is blank
+otherwise. Starring is local to your machine and doesn't call the GitHub
+API; toggle it with the `star` keybinding.
+
+This column has no heading text.
 
 ## PR Updated At Column
 

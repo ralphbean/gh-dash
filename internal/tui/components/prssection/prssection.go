@@ -163,6 +163,21 @@ func (m *Model) Update(msg tea.Msg) (section.Section, tea.Cmd) {
 
 		case key.Matches(msg, keys.PRKeys.WatchChecks):
 			cmd = m.watchChecks()
+
+		case key.Matches(msg, keys.PRKeys.Star):
+			if pr := m.GetCurrRow(); pr != nil {
+				key := starKey(pr)
+				starred := data.GetStarStore().Toggle(key)
+				sid := tasks.SectionIdentifier{Id: m.Id, Type: SectionType}
+				cmd = tasks.StarFeedback(
+					m.Ctx,
+					sid,
+					key,
+					fmt.Sprintf("PR #%d", pr.GetNumber()),
+					starred,
+				)
+				m.Table.SetRows(m.BuildRows())
+			}
 		}
 
 	case tasks.UpdatePRMsg:
@@ -298,9 +313,15 @@ func GetSectionColumns(
 	ciLayout := config.MergeColumnConfigs(dLayout.Ci, sLayout.Ci)
 	labelsLayout := config.MergeColumnConfigs(dLayout.Labels, sLayout.Labels)
 	linesLayout := config.MergeColumnConfigs(dLayout.Lines, sLayout.Lines)
+	starLayout := config.MergeColumnConfigs(dLayout.Star, sLayout.Star)
 
 	if !ctx.Config.Theme.Ui.Table.Compact {
 		return []table.Column{
+			{
+				Title:  "",
+				Width:  utils.IntPtr(2),
+				Hidden: starLayout.Hidden,
+			},
 			{
 				Title:  "",
 				Width:  utils.IntPtr(3),
@@ -361,6 +382,11 @@ func GetSectionColumns(
 	}
 
 	return []table.Column{
+		{
+			Title:  "",
+			Width:  utils.IntPtr(2),
+			Hidden: starLayout.Hidden,
+		},
 		{
 			Title:  "",
 			Width:  utils.IntPtr(3),

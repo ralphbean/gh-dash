@@ -8,6 +8,7 @@ import (
 	"charm.land/lipgloss/v2/compat"
 	checks "github.com/dlvhdr/x/gh-checks"
 
+	"github.com/dlvhdr/gh-dash/v4/internal/data"
 	"github.com/dlvhdr/gh-dash/v4/internal/git"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/common"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components"
@@ -67,6 +68,19 @@ func (pr *PullRequest) renderReviewStatus() string {
 	}
 
 	return reviewCellStyle.Render(pr.Ctx.Styles.Common.WaitingGlyph)
+}
+
+func (pr *PullRequest) renderStar() string {
+	if pr.Data == nil || pr.Data.Primary == nil {
+		return ""
+	}
+
+	key := fmt.Sprintf("pr:%s#%d", pr.Data.GetRepoNameWithOwner(), pr.Data.GetNumber())
+	if !data.GetStarStore().IsStarred(key) {
+		return ""
+	}
+
+	return pr.getTextStyle().Foreground(pr.Ctx.Theme.WarningText).Render(constants.StarIcon)
 }
 
 func (pr *PullRequest) renderState() string {
@@ -388,6 +402,7 @@ func (pr *PullRequest) RenderMergeStateStatus() string {
 func (pr *PullRequest) ToTableRow(isSelected bool) table.Row {
 	if !pr.Ctx.Config.Theme.Ui.Table.Compact {
 		return table.Row{
+			pr.renderStar(),
 			pr.renderState(),
 			pr.renderExtendedTitle(isSelected),
 			pr.renderLabels(isSelected),

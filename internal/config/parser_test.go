@@ -15,6 +15,7 @@ import (
 	"github.com/knadh/koanf/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	yamlmarshaller "gopkg.in/yaml.v3"
 
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/testutils"
 )
@@ -221,6 +222,21 @@ func setXDGConfigHomeEnvVar(t *testing.T, dir string) func() {
 	return func() {
 		os.Unsetenv("XDG_CONFIG_HOME")
 	}
+}
+
+func TestPrsLayoutConfig_ParsesStarColumn(t *testing.T) {
+	var layout PrsLayoutConfig
+	err := yamlmarshaller.Unmarshal([]byte(`
+star:
+  hidden: true
+  width: 2
+`), &layout)
+	require.NoError(t, err)
+
+	require.NotNil(t, layout.Star.Hidden)
+	assert.True(t, *layout.Star.Hidden)
+	require.NotNil(t, layout.Star.Width)
+	assert.Equal(t, 2, *layout.Star.Width)
 }
 
 func TestValidateSnoozePreset(t *testing.T) {

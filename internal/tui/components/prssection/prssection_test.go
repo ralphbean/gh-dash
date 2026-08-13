@@ -1,6 +1,8 @@
 package prssection
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -13,7 +15,9 @@ import (
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/search"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/section"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/tasks"
+	"github.com/dlvhdr/gh-dash/v4/internal/tui/constants"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/context"
+	"github.com/dlvhdr/gh-dash/v4/internal/tui/keys"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/theme"
 )
 
@@ -178,4 +182,57 @@ func TestUpdatePRMsg_NewThreadReplyAppendsCommentToMatchingThread(t *testing.T) 
 	require.Empty(t, m.Prs[0].Enriched.ReviewThreads.Nodes[0].Comments.Nodes)
 	require.Len(t, m.Prs[0].Enriched.ReviewThreads.Nodes[1].Comments.Nodes, 1)
 	require.Equal(t, "sounds good", m.Prs[0].Enriched.ReviewThreads.Nodes[1].Comments.Nodes[0].Body)
+}
+
+func withTestStarStore(t *testing.T) *data.StarStore {
+	t.Helper()
+	tempDir, err := os.MkdirTemp("", "gh-dash-star-test")
+	require.NoError(t, err)
+	t.Cleanup(func() { os.RemoveAll(tempDir) })
+
+	store := data.NewStarStoreForTesting(filepath.Join(tempDir, "starred.json"))
+	restore := data.OverrideStarStoreForTesting(store)
+	t.Cleanup(restore)
+	return store
+}
+
+func starKeyPressMsg() tea.KeyPressMsg {
+	k := keys.PRKeys.Star.Keys()[0]
+	return tea.KeyPressMsg{Code: rune(k[0]), Text: k}
+}
+
+func TestStar_TogglesSelectedRow(t *testing.T) {
+	withTestStarStore(t)
+
+	m := newTestModel("")
+	m.IsPromptConfirmationShown = false
+
+	msg := starKeyPressMsg()
+	_, _ = m.Update(msg)
+
+	require.True(t, data.GetStarStore().IsStarred("pr:#42"),
+		"pressing the star key should star the selected PR")
+
+	_, _ = m.Update(msg)
+
+	require.False(t, data.GetStarStore().IsStarred("pr:#42"),
+		"pressing the star key again should unstar the selected PR")
+}
+
+func TestStar_NoOpWithoutCurrRow(t *testing.T) {
+	withTestStarStore(t)
+
+	m := newTestModel("")
+	m.IsPromptConfirmationShown = false
+	m.Prs = nil
+
+	msg := starKeyPressMsg()
+	_, cmd := m.Update(msg)
+
+	require.False(t, data.GetStarStore().IsStarred("pr:#42"))
+	for _, msg := range collectMsgs(t, cmd) {
+		if _, ok := msg.(constants.TaskFinishedMsg); ok {
+			t.Fatal("no current row should not surface star feedback")
+		}
+	}
 }

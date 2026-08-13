@@ -56,6 +56,7 @@ const (
 	MergeQueueIcon     = "" // \uf4db nf-oct-git_merge_queue
 	OpenIcon           = ""
 	SelectionIcon      = "→"
+	StarIcon           = "" // nf-fa-star
 
 	AutocompleteColumnGap              = 2
 	AutocompleteMinValueWidth          = 8

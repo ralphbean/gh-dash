@@ -1,6 +1,8 @@
 package prrow
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -8,6 +10,7 @@ import (
 	"charm.land/lipgloss/v2/compat"
 	graphql "github.com/cli/shurcooL-graphql"
 	checks "github.com/dlvhdr/x/gh-checks"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dlvhdr/gh-dash/v4/internal/config"
 	"github.com/dlvhdr/gh-dash/v4/internal/data"
@@ -16,6 +19,18 @@ import (
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/context"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/theme"
 )
+
+func withTestStarStore(t *testing.T) *data.StarStore {
+	t.Helper()
+	tempDir, err := os.MkdirTemp("", "gh-dash-star-test")
+	require.NoError(t, err)
+	t.Cleanup(func() { os.RemoveAll(tempDir) })
+
+	store := data.NewStarStoreForTesting(filepath.Join(tempDir, "starred.json"))
+	restore := data.OverrideStarStoreForTesting(store)
+	t.Cleanup(restore)
+	return store
+}
 
 func newTestContext(t *testing.T) *context.ProgramContext {
 	t.Helper()
@@ -97,6 +112,69 @@ func TestRenderNumComments(t *testing.T) {
 			}
 			if tt.expected == "" && result != "" {
 				t.Errorf("renderNumComments() = %q, want empty string", result)
+			}
+		})
+	}
+}
+
+func TestRenderStar(t *testing.T) {
+	tests := []struct {
+		name     string
+		pr       *PullRequest
+		starred  bool
+		expected string
+	}{
+		{
+			name:     "nil Data returns empty string",
+			pr:       &PullRequest{Data: nil},
+			expected: "",
+		},
+		{
+			name:     "nil Primary returns empty string",
+			pr:       &PullRequest{Data: &Data{Primary: nil}},
+			expected: "",
+		},
+		{
+			name: "unstarred PR renders blank",
+			pr: &PullRequest{
+				Data: &Data{
+					Primary: &data.PullRequestData{
+						Number:     1,
+						Repository: data.Repository{NameWithOwner: "owner/repo"},
+					},
+				},
+			},
+			starred:  false,
+			expected: "",
+		},
+		{
+			name: "starred PR renders the star glyph",
+			pr: &PullRequest{
+				Data: &Data{
+					Primary: &data.PullRequestData{
+						Number:     1,
+						Repository: data.Repository{NameWithOwner: "owner/repo"},
+					},
+				},
+			},
+			starred:  true,
+			expected: constants.StarIcon,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := withTestStarStore(t)
+			if tt.starred {
+				store.Star("pr:owner/repo#1")
+			}
+
+			tt.pr.Ctx = newTestContext(t)
+			result := tt.pr.renderStar()
+			if tt.expected == "" {
+				require.Equal(t, "", result)
+			} else {
+				require.Contains(t, result, tt.expected)
 			}
 		})
 	}

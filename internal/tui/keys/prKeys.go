@@ -34,6 +34,7 @@ type PRKeyMap struct {
 	TriageNextThread     key.Binding
 	TriagePrevThread     key.Binding
 	TriageResolve        key.Binding
+	Star                 key.Binding
 }
 
 var PRKeys = PRKeyMap{
@@ -133,6 +134,10 @@ var PRKeys = PRKeyMap{
 		key.WithKeys("r"),
 		key.WithHelp("r", "resolve thread"),
 	),
+	Star: key.NewBinding(
+		key.WithKeys("*"),
+		key.WithHelp("*", "toggle star"),
+	),
 }
 
 func PRFullHelp() []key.Binding {
@@ -160,6 +165,7 @@ func PRFullHelp() []key.Binding {
 		PRKeys.TriageNextThread,
 		PRKeys.TriagePrevThread,
 		PRKeys.TriageResolve,
+		PRKeys.Star,
 	}
 }
 
@@ -236,6 +242,8 @@ func rebindPRKeys(keys []config.Keybinding) error {
 			key = &PRKeys.TriagePrevThread
 		case "triageResolve":
 			key = &PRKeys.TriageResolve
+		case "star":
+			key = &PRKeys.Star
 		default:
 			return fmt.Errorf("unknown built-in pr key: '%s'", prKey.Builtin)
 		}
