@@ -13,3 +13,4 @@ testdata/gh-schema.graphql
 .task/
 /sponsors.json
 resterm.env.json
+.claude/settings.local.json
