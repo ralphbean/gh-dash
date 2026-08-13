@@ -2536,6 +2536,79 @@ func TestTriageThreads_HelpToggleStillWorks(t *testing.T) {
 	require.False(t, m.footer.ShowAll, "? should toggle help off again")
 }
 
+func TestTriageThreads_FullHelpSurvivesMovingToNextThread(t *testing.T) {
+	zone.NewGlobal()
+	zone.SetEnabled(false)
+
+	m := newTriageTestModel(t, []data.ReviewThreadWithComments{
+		{Id: "t1", Path: "a.go", Line: 1},
+		{Id: "t2", Path: "b.go", Line: 1},
+	})
+
+	newModel, _ := m.Update(tea.KeyPressMsg{Text: "?"})
+	m = newModel.(Model)
+	require.True(t, m.footer.ShowAll)
+
+	newModel, _ = m.Update(tea.KeyPressMsg{Text: "n"})
+	m = newModel.(Model)
+	require.True(t, m.footer.ShowAll, "help should stay open after moving to the next thread")
+
+	content := m.View().Content
+
+	for _, want := range []string{"next thread", "previous thread", "reply to thread", "resolve thread"} {
+		require.Contains(t, content, want,
+			"full help after cycling threads should still list the triage key %q", want)
+	}
+}
+
+func TestTriageThreads_HelpDoesNotOverflowScreenAfterMovingThreads(t *testing.T) {
+	zone.NewGlobal()
+	zone.SetEnabled(false)
+
+	longComments := make([]data.ReviewComment, 20)
+	for i := range longComments {
+		longComments[i] = data.ReviewComment{Body: "a long comment body taking up its own line"}
+	}
+
+	m := newTriageTestModel(t, []data.ReviewThreadWithComments{
+		{Id: "t1", Path: "a.go", Line: 1},
+		{Id: "t2", Path: "b.go", Line: 1, Comments: data.ReviewComments{Nodes: longComments}},
+	})
+
+	newModel, _ := m.Update(tea.KeyPressMsg{Text: "?"})
+	m = newModel.(Model)
+	require.True(t, m.footer.ShowAll)
+
+	newModel, _ = m.Update(tea.KeyPressMsg{Text: "n"})
+	m = newModel.(Model)
+
+	lineCount := strings.Count(m.View().Content, "\n") + 1
+	require.LessOrEqual(t, lineCount, m.ctx.ScreenHeight,
+		"rendered view should not overflow the terminal height after moving threads")
+}
+
+func TestTriageThreads_FullHelpShowsOnlyTriageKeys(t *testing.T) {
+	zone.NewGlobal()
+	zone.SetEnabled(false)
+
+	m := newTriageTestModel(t, []data.ReviewThreadWithComments{{Id: "t1"}})
+
+	newModel, _ := m.Update(tea.KeyPressMsg{Text: "?"})
+	m = newModel.(Model)
+	require.True(t, m.footer.ShowAll)
+
+	content := m.View().Content
+
+	for _, want := range []string{"next thread", "previous thread", "reply to thread", "resolve thread"} {
+		require.Contains(t, content, want,
+			"full help while triaging should list the triage key %q", want)
+	}
+	for _, unwanted := range []string{"approve", "merge", "checkout"} {
+		require.NotContains(t, content, unwanted,
+			"full help while triaging should not list the inactive PR action %q", unwanted)
+	}
+}
+
 func TestExitDetailsView_RestoresPriorPreviewState(t *testing.T) {
 	tests := []struct {
 		name          string

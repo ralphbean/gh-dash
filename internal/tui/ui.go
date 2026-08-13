@@ -287,6 +287,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case m.prView.IsTriagingThreads() && key.Matches(msg, m.keys.Help):
 				m.footer.ShowAll = !m.footer.ShowAll
 				m.syncMainContentDimensions()
+				m.syncProgramContext()
 				return m, nil
 
 			case m.prView.IsTriagingThreads():
@@ -1063,6 +1064,8 @@ func (m Model) View() tea.View {
 		)
 		return v
 	}
+
+	keys.SetTriageActive(m.prView.IsTriagingThreads())
 
 	s := strings.Builder{}
 	if !m.detailsViewState.active && m.ctx.View != config.RepoView {

@@ -264,6 +264,67 @@ func TestRebindNotificationKeys_CustomCommand(t *testing.T) {
 	}
 }
 
+func TestSetTriageActive(t *testing.T) {
+	defer SetTriageActive(false)
+
+	SetTriageActive(true)
+	if !triageActive {
+		t.Error("expected triageActive to be true")
+	}
+
+	SetTriageActive(false)
+	if triageActive {
+		t.Error("expected triageActive to be false")
+	}
+}
+
+func TestFullHelpShowsOnlyTriageKeysWhenTriageActive(t *testing.T) {
+	keymap := CreateKeyMapForView(config.PRsView)
+	SetTriageActive(true)
+	defer SetTriageActive(false)
+
+	help := keymap.FullHelp()
+
+	var allKeys []key.Binding
+	for _, section := range help {
+		allKeys = append(allKeys, section...)
+	}
+
+	for _, desc := range []string{"next thread", "previous thread", "reply to thread", "resolve thread"} {
+		if !findKeyByHelp(allKeys, desc) {
+			t.Errorf("expected triage key %q to be present while triaging", desc)
+		}
+	}
+
+	for _, desc := range []string{"approve", "merge", "close", "label", "checkout", "comment"} {
+		if findKeyByHelp(allKeys, desc) {
+			t.Errorf("expected PR action key %q to NOT be present while triaging", desc)
+		}
+	}
+}
+
+func TestFullHelpShowsNormalPRKeysWhenTriageInactive(t *testing.T) {
+	keymap := CreateKeyMapForView(config.PRsView)
+	SetTriageActive(false)
+
+	help := keymap.FullHelp()
+
+	var allKeys []key.Binding
+	for _, section := range help {
+		allKeys = append(allKeys, section...)
+	}
+
+	if !findKeyByHelp(allKeys, "approve") {
+		t.Error("expected PR key 'approve' to be present when not triaging")
+	}
+
+	for _, desc := range []string{"next thread", "previous thread", "reply to thread", "resolve thread"} {
+		if findKeyByHelp(allKeys, desc) {
+			t.Errorf("expected triage key %q to NOT be present when not triaging", desc)
+		}
+	}
+}
+
 func TestFullHelpIncludesCustomNotificationBindings(t *testing.T) {
 	// Set up custom notification bindings
 	CustomNotificationBindings = []key.Binding{

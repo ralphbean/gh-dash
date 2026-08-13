@@ -162,10 +162,24 @@ func PRFullHelp() []key.Binding {
 		PRKeys.ViewIssues,
 		PRKeys.Snooze,
 		PRKeys.TriageThreads,
+		PRKeys.Star,
+	}
+}
+
+// PRTriageFullHelp returns the keybindings relevant while the review-thread
+// triage workflow is active, in place of PRFullHelp's normal PR action
+// list (which is inert while triaging). It reuses PRKeys.Comment's current
+// key for display but with triage-specific help text, since replying to a
+// thread - not commenting on the PR - is what that key does while triaging.
+func PRTriageFullHelp() []key.Binding {
+	reply := PRKeys.Comment
+	reply.SetHelp(reply.Help().Key, "reply to thread")
+
+	return []key.Binding{
 		PRKeys.TriageNextThread,
 		PRKeys.TriagePrevThread,
+		reply,
 		PRKeys.TriageResolve,
-		PRKeys.Star,
 	}
 }
 

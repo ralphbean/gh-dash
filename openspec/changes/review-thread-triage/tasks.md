@@ -120,6 +120,17 @@
       triage output. Required adding triage-gated `Down`/`Up`/`FirstLine`/
       `LastLine` cases ahead of the triage catch-all in the guard switch,
       since the catch-all would otherwise shadow them - verify via test.
+- [x] 6.5 Add a `triageActive`-style package-level flag and
+      `SetTriageActive(bool)` to `internal/tui/keys/keys.go`, mirroring
+      `notificationSubject`/`SetNotificationSubject`. In `KeyMap.FullHelp()`'s
+      `case config.PRsView:` branch, use it to substitute a triage-only
+      binding list (`TriageNextThread`, `TriagePrevThread`, `Comment`,
+      `TriageResolve`) for `PRFullHelp()` when active, per design.md
+      Decision 7. Call `keys.SetTriageActive(m.prView.IsTriagingThreads())`
+      from `ui.go` alongside the existing per-render UI state sync.
+- [x] 6.6 Remove `TriageNextThread`/`TriagePrevThread`/`TriageResolve` from
+      `PRFullHelp()`'s normal (non-triaging) binding list, keeping
+      `TriageThreads`, per design.md Decision 7's correction.
 
 ## 7. Tests
 
@@ -151,3 +162,7 @@
       triage-mode meaning) in the keybindings reference under
       `docs/src/content/...`, alongside the existing `enter`/`esc`
       details-view entries.
+- [x] 8.2 Note in that same docs section that the in-app help footer (`?`)
+      reflects these bindings while triaging, so the keybindings reference
+      and the live help stay in sync as a discoverability path (not just
+      the static docs page).

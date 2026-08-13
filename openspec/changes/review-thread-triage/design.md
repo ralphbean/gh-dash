@@ -278,6 +278,41 @@ comment); showing multiple slightly-different hunks for one thread would
 be confusing rather than clarifying, and the anchoring comment's hunk is
 the one that best represents "where this thread is in the diff."
 
+### 7. Help footer: a triage-active flag in the `keys` package, mirroring the existing `notificationSubject` precedent
+The footer (`internal/tui/components/footer/footer.go`) always renders full
+help via `keys.CreateKeyMapForView(m.ctx.View)`, which calls
+`KeyMap.FullHelp()`. That method already switches its returned bindings on
+a package-level variable for one other context-dependent case:
+`notificationSubject` (set via `keys.SetNotificationSubject(...)`) swaps in
+`PRFullHelp()`/`IssueFullHelp()` depending on what's open in the
+Notifications details view.
+
+Triage follows the same shape: a package-level flag in `keys` (e.g.
+`triageActive bool`, set via `keys.SetTriageActive(bool)`), read inside
+`FullHelp()`'s `case config.PRsView:` branch. When true, `additionalKeys`
+becomes a small triage-only list (`TriageNextThread`, `TriagePrevThread`,
+`Comment` (reply), `TriageResolve`) instead of `PRFullHelp()`. `ui.go` calls
+`keys.SetTriageActive(m.prView.IsTriagingThreads())` at the same point it
+already syncs other per-render UI state (mirroring where
+`SetNotificationSubject` is called today).
+
+This also corrects an existing inaccuracy in `PRFullHelp()`: it already
+unconditionally lists `TriageNextThread`/`TriagePrevThread`/`TriageResolve`
+even outside triage, where those keys either do nothing (`n`/`N`) or do
+something else entirely (`r` is `Refresh` outside triage - see the
+Risks/Trade-offs section on key reuse). `PRFullHelp()` drops those three
+entries, keeping only `TriageThreads` (the key that actually works outside
+an active triage session, to enter it).
+
+Alternatives considered: adding a `HelpKeys() []key.Binding` method to
+`prview.Model` and having the footer ask it directly. Rejected - the
+footer has no reference to `prview.Model` today (it only holds
+`*context.ProgramContext`), and `keys.KeyMap.FullHelp()` is already the
+single place that assembles per-view help; adding a second,
+component-owned help source would split "what help is shown right now"
+across two places for no benefit over extending the existing
+package-level-flag pattern already established for notifications.
+
 ## Risks / Trade-offs
 
 - **[Risk]** Reusing `c` (Comment) and `r` (Refresh) with different

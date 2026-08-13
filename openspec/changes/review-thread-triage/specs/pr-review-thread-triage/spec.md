@@ -155,3 +155,26 @@ close, checkout) SHALL have no effect.
   not one of the triage workflow's own keys (enter/exit, next/previous
   thread, reply, resolve, scroll) while the triage workflow is active
 - **THEN** the system SHALL take no action for that key press
+
+### Requirement: Triage keybindings are shown in the help footer
+While the triage workflow is active, opening the full help footer SHALL
+show only the triage workflow's own keybindings, not the normal
+pull-request action bindings that the previous requirement makes inactive
+during triage.
+
+#### Scenario: Full help while triaging
+- **WHEN** the user opens the full help footer while the triage workflow is
+  active
+- **THEN** the system SHALL list the triage workflow's keybindings (next
+  thread, previous thread, reply, resolve, exit) and SHALL NOT list
+  pull-request action bindings that are inactive during triage (for
+  example: approve, assign, label, merge, close, checkout)
+
+#### Scenario: Full help outside triage
+- **WHEN** the user opens the full help footer for a pull request while the
+  triage workflow is not active
+- **THEN** the system SHALL list the normal pull-request action bindings
+  and the key that enters triage, and SHALL NOT list the triage-only
+  next-thread, previous-thread, or resolve bindings, since those keys have
+  no effect (or, for a key also bound to an unrelated action outside
+  triage, a different effect) until triage is active

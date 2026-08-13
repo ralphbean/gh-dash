@@ -27,6 +27,16 @@ func SetNotificationSubject(subjectType NotificationSubjectType) {
 	notificationSubject = subjectType
 }
 
+// triageActive tracks whether the review-thread triage workflow is
+// currently active, for help display.
+var triageActive bool
+
+// SetTriageActive sets whether the review-thread triage workflow is
+// currently active, for help display.
+func SetTriageActive(active bool) {
+	triageActive = active
+}
+
 type KeyMap struct {
 	viewType              config.ViewType
 	Up                    key.Binding
@@ -71,8 +81,12 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 
 	switch k.viewType {
 	case config.PRsView:
-		additionalKeys = PRFullHelp()
-		customKeys = append(customKeys, CustomPRBindings...)
+		if triageActive {
+			additionalKeys = PRTriageFullHelp()
+		} else {
+			additionalKeys = PRFullHelp()
+			customKeys = append(customKeys, CustomPRBindings...)
+		}
 	case config.RepoView:
 		additionalKeys = BranchFullHelp()
 		customKeys = append(customKeys, CustomBranchBindings...)
