@@ -46,6 +46,8 @@ type KeyMap struct {
 	Search                key.Binding
 	CopyUrl               key.Binding
 	CopyNumber            key.Binding
+	Enter                 key.Binding
+	Esc                   key.Binding
 	Help                  key.Binding
 	Quit                  key.Binding
 }
@@ -129,6 +131,8 @@ func (k KeyMap) AppKeys() []key.Binding {
 		k.CopyNumber,
 		k.CopyUrl,
 		k.Search,
+		k.Enter,
+		k.Esc,
 	}
 }
 
@@ -200,6 +204,14 @@ var Keys = &KeyMap{
 	CopyUrl: key.NewBinding(
 		key.WithKeys("Y"),
 		key.WithHelp("Y", "copy url"),
+	),
+	Enter: key.NewBinding(
+		key.WithKeys("enter"),
+		key.WithHelp("enter", "view details"),
+	),
+	Esc: key.NewBinding(
+		key.WithKeys("esc"),
+		key.WithHelp("esc", "exit details view"),
 	),
 	Help: key.NewBinding(
 		key.WithKeys("?"),
@@ -316,6 +328,10 @@ func rebindUniversal(universal []config.Keybinding) error {
 			key = &Keys.CopyUrl
 		case "copyNumber":
 			key = &Keys.CopyNumber
+		case "enter":
+			key = &Keys.Enter
+		case "esc":
+			key = &Keys.Esc
 		case "help":
 			key = &Keys.Help
 		case "quit":

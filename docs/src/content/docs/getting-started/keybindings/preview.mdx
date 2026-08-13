@@ -34,3 +34,20 @@ Press <kbd>[</kbd> to move to the previous tab in the preview sidebar, if one ex
 ## `]` - Next Preview Tab
 
 Press <kbd>]</kbd> to move to the next tab in the preview sidebar, if one exists.
+
+## `enter` - View Details
+
+Press <kbd>Enter</kbd> on a selected row to open its preview in a full-window details view. While
+the details view is active, <kbd>j</kbd>/<kbd>k</kbd> (or the arrow keys) scroll the preview
+instead of moving the list selection, and <kbd>g</kbd>/<kbd>G</kbd> jump to the top/bottom of the
+preview. Section-switching (<kbd>h</kbd>/<kbd>l</kbd>) and preview-toggle (<kbd>p</kbd>/<kbd>P</kbd>)
+are disabled while the details view is active, but item actions (approve, comment, merge, etc.)
+still work as usual.
+
+In the Notifications view, the first <kbd>Enter</kbd> loads the notification's content into the
+preview; press <kbd>Enter</kbd> again to enter the details view.
+
+## `esc` - Exit Details View
+
+Press <kbd>Esc</kbd> to exit the details view and return to the previous layout, restoring the
+preview pane's open/closed state and position from before the details view was entered.

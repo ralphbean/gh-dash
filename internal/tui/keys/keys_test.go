@@ -177,6 +177,43 @@ func findKeyByHelp(keys []key.Binding, helpDesc string) bool {
 	return false
 }
 
+func TestUniversalKeys_EnterAndEscDefaults(t *testing.T) {
+	if got := Keys.Enter.Keys(); len(got) != 1 || got[0] != "enter" {
+		t.Errorf("expected default Enter binding to be 'enter', got %v", got)
+	}
+	if got := Keys.Esc.Keys(); len(got) != 1 || got[0] != "esc" {
+		t.Errorf("expected default Esc binding to be 'esc', got %v", got)
+	}
+}
+
+func TestRebindUniversal_EnterAndEsc(t *testing.T) {
+	origEnterKey := Keys.Enter.Keys()
+	origEnterHelp := Keys.Enter.Help().Desc
+	origEscKey := Keys.Esc.Keys()
+	origEscHelp := Keys.Esc.Help().Desc
+	defer func() {
+		Keys.Enter.SetKeys(origEnterKey...)
+		Keys.Enter.SetHelp(origEnterKey[0], origEnterHelp)
+		Keys.Esc.SetKeys(origEscKey...)
+		Keys.Esc.SetHelp(origEscKey[0], origEscHelp)
+	}()
+
+	err := rebindUniversal([]config.Keybinding{
+		{Builtin: "enter", Key: "ctrl+e"},
+		{Builtin: "esc", Key: "ctrl+g"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if got := Keys.Enter.Keys(); len(got) != 1 || got[0] != "ctrl+e" {
+		t.Errorf("expected Enter to be rebound to ctrl+e, got %v", got)
+	}
+	if got := Keys.Esc.Keys(); len(got) != 1 || got[0] != "ctrl+g" {
+		t.Errorf("expected Esc to be rebound to ctrl+g, got %v", got)
+	}
+}
+
 func TestRebindNotificationKeys_Builtin(t *testing.T) {
 	// Save original key and restore after test
 	origKey := NotificationKeys.MarkAsDone.Keys()

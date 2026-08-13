@@ -67,6 +67,15 @@ type Model struct {
 	taskSpinner      spinner.Model
 	tasks            map[string]context.Task
 	positionOverride string // "" means no override, "right" or "bottom"
+	detailsViewState detailsViewState
+}
+
+// detailsViewState tracks whether the full-window details view is active,
+// along with what to restore the preview pane to on exit.
+type detailsViewState struct {
+	active       bool
+	prevOpen     bool
+	prevPosition string
 }
 
 type Repositories struct {
@@ -231,6 +240,46 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
+		// While the details view is active, list-navigation keys scroll the
+		// preview instead of moving the list selection, and section-switch /
+		// preview-toggle keys are no-ops. Everything else (item actions,
+		// page up/down, tab switching, ...) falls through to the switch
+		// below unchanged.
+		if m.detailsViewState.active {
+			switch {
+			case key.Matches(msg, m.keys.Down):
+				m.sidebar.ScrollDown(1)
+				return m, nil
+
+			case key.Matches(msg, m.keys.Up):
+				m.sidebar.ScrollUp(1)
+				return m, nil
+
+			case key.Matches(msg, m.keys.FirstLine):
+				m.sidebar.ScrollToTop()
+				return m, nil
+
+			case key.Matches(msg, m.keys.LastLine):
+				m.sidebar.ScrollToBottom()
+				return m, nil
+
+			case key.Matches(msg, m.keys.PrevSection),
+				key.Matches(msg, m.keys.NextSection),
+				key.Matches(msg, m.keys.TogglePreview),
+				key.Matches(msg, m.keys.TogglePreviewPosition):
+				return m, nil
+
+			case key.Matches(msg, m.keys.Esc):
+				m.exitDetailsView()
+				return m, nil
+
+			case key.Matches(msg, m.keys.Enter):
+				// Already in the details view; re-entering has no meaning,
+				// and this keeps NotificationKeys.View from re-firing here.
+				return m, nil
+			}
+		}
+
 		switch {
 		case m.isUserDefinedKeybinding(msg):
 			cmd = m.executeKeybinding(msg.String())
@@ -366,6 +415,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			m.footer.SetShowConfirmQuit(true)
+
+		// Entering the details view is gated on readyForDetailsView() so that,
+		// for Notifications, this case is skipped (and the switch falls
+		// through to the config.NotificationsView case below) until a
+		// subject has already been loaded into the preview.
+		case key.Matches(msg, m.keys.Enter) && !m.detailsViewState.active &&
+			currSection != nil && currRowData != nil && m.readyForDetailsView():
+			m.enterDetailsView()
 
 		case m.ctx.View == config.RepoView:
 			switch {
@@ -948,13 +1005,15 @@ func (m Model) View() tea.View {
 	}
 
 	s := strings.Builder{}
-	if m.ctx.View != config.RepoView {
+	if !m.detailsViewState.active && m.ctx.View != config.RepoView {
 		s.WriteString(m.tabs.View())
 	}
 	s.WriteString("\n")
 	content := "No sections defined"
 	currSection := m.getCurrSection()
-	if currSection != nil {
+	if m.detailsViewState.active {
+		content = m.sidebar.View()
+	} else if currSection != nil {
 		if m.ctx.PreviewPosition == "bottom" && m.sidebar.IsOpen {
 			content = lipgloss.JoinVertical(
 				lipgloss.Left,
@@ -990,7 +1049,7 @@ func (m Model) View() tea.View {
 		lipgloss.NewLayer(zone.Scan(s.String())),
 	}
 
-	if currSection != nil {
+	if !m.detailsViewState.active && currSection != nil {
 		searchCmp := currSection.ViewCompletions()
 		if searchCmp != "" {
 			y := common.HeaderHeight + common.SearchHeight + 1
@@ -1195,6 +1254,18 @@ func (m *Model) syncMainContentDimensions() {
 
 	m.ctx.SidebarOpen = true
 
+	if m.detailsViewState.active {
+		// Full-window: reuse the "bottom" full-width layout math for both
+		// DynamicPreviewWidth/Height and the "right" layout math for
+		// MainContentHeight, so sidebar.View() renders full-window
+		// regardless of which layout branch it takes.
+		m.ctx.MainContentWidth = 0
+		m.ctx.MainContentHeight = m.getBaseContentHeight()
+		m.ctx.DynamicPreviewWidth = m.ctx.ScreenWidth
+		m.ctx.DynamicPreviewHeight = m.getBaseContentHeight()
+		return
+	}
+
 	if m.ctx.PreviewPosition == "bottom" {
 		m.ctx.MainContentWidth = m.ctx.ScreenWidth
 
@@ -1233,6 +1304,37 @@ func (m *Model) openSidebarForInput(setFunc func(bool) tea.Cmd) tea.Cmd {
 	m.syncSidebar()
 	m.sidebar.ScrollToBottom()
 	return cmd
+}
+
+// readyForDetailsView reports whether pressing Enter should enter the
+// full-window details view for the currently selected row. PRs, Issues, and
+// Repo (branches) are always ready; Notifications are only ready once the
+// notification's content has been loaded into the preview.
+func (m *Model) readyForDetailsView() bool {
+	if m.ctx.View == config.NotificationsView {
+		return m.notificationView.GetSubjectPR() != nil ||
+			m.notificationView.GetSubjectIssue() != nil
+	}
+	return true
+}
+
+func (m *Model) enterDetailsView() {
+	m.detailsViewState = detailsViewState{
+		active:       true,
+		prevOpen:     m.sidebar.IsOpen,
+		prevPosition: m.positionOverride,
+	}
+	m.sidebar.IsOpen = true
+	m.syncMainContentDimensions()
+}
+
+func (m *Model) exitDetailsView() {
+	m.sidebar.IsOpen = m.detailsViewState.prevOpen
+	m.positionOverride = m.detailsViewState.prevPosition
+	m.detailsViewState = detailsViewState{}
+	m.syncMainContentDimensions()
+	m.syncProgramContext()
+	m.syncSidebar()
 }
 
 func (m *Model) backToNotification() tea.Cmd {

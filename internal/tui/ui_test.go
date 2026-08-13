@@ -358,10 +358,9 @@ func TestNotificationView_PRViewTabNavigation(t *testing.T) {
 		"prView tab should have changed after pressing prev tab key")
 }
 
-func TestNotificationView_EnterKeyWorksAfterViewingPR(t *testing.T) {
-	// Test that pressing Enter still works after a PR notification has been viewed.
-	// Previously, once a PR subject was set, Enter would be absorbed by the PR handler
-	// instead of triggering loadNotificationContent().
+func TestNotificationView_EnterKeyEntersDetailsViewAfterViewingPR(t *testing.T) {
+	// Once a PR subject is loaded (i.e. Enter was already pressed once), a second
+	// Enter press should enter the details view rather than reloading content.
 	cfg, err := config.ParseConfig(config.Location{
 		ConfigFlag:       "../config/testdata/test-config.yml",
 		SkipGlobalConfig: true,
@@ -423,16 +422,17 @@ func TestNotificationView_EnterKeyWorksAfterViewingPR(t *testing.T) {
 
 	// Send Enter key
 	msg := tea.KeyPressMsg{Code: tea.KeyEnter}
-	_, cmd := m.Update(msg)
+	newModel, _ := m.Update(msg)
+	m = newModel.(Model)
 
-	// The fix ensures Enter triggers loadNotificationContent() even when a subject is set.
-	// loadNotificationContent() returns a batch command for PR notifications.
-	// Before the fix, Enter would be absorbed by the PR handler and cmd would be nil.
-	require.NotNil(t, cmd, "Enter key should trigger loadNotificationContent and return a command")
+	// A second Enter (subject already loaded) should enter the details view.
+	require.True(t, m.detailsViewState.active,
+		"Enter key should enter the details view once a PR subject is loaded")
 }
 
-func TestNotificationView_EnterKeyWorksAfterViewingIssue(t *testing.T) {
-	// Test that pressing Enter still works after an Issue notification has been viewed.
+func TestNotificationView_EnterKeyEntersDetailsViewAfterViewingIssue(t *testing.T) {
+	// Once an Issue subject is loaded (i.e. Enter was already pressed once), a
+	// second Enter press should enter the details view rather than reloading content.
 	cfg, err := config.ParseConfig(config.Location{
 		ConfigFlag:       "../config/testdata/test-config.yml",
 		SkipGlobalConfig: true,
@@ -494,10 +494,12 @@ func TestNotificationView_EnterKeyWorksAfterViewingIssue(t *testing.T) {
 
 	// Send Enter key
 	msg := tea.KeyPressMsg{Code: tea.KeyEnter}
-	_, cmd := m.Update(msg)
+	newModel, _ := m.Update(msg)
+	m = newModel.(Model)
 
-	// The fix ensures Enter triggers loadNotificationContent() even when a subject is set.
-	require.NotNil(t, cmd, "Enter key should trigger loadNotificationContent and return a command")
+	// A second Enter (subject already loaded) should enter the details view.
+	require.True(t, m.detailsViewState.active,
+		"Enter key should enter the details view once an Issue subject is loaded")
 }
 
 func TestNotificationView_BackKeyClearsPRSubjectAndRestoresNotificationActions(t *testing.T) {
@@ -2260,4 +2262,329 @@ func TestNotificationCommandTemplateVariables(t *testing.T) {
 			require.Equal(t, tc.expected, result)
 		})
 	}
+}
+
+// newDetailsViewTestModel builds a PRsView Model with numRows PR rows in a
+// single section, for exercising details-view key routing end-to-end.
+func newDetailsViewTestModel(t *testing.T, numRows int, sidebarOpen bool) Model {
+	t.Helper()
+	cfg, err := config.ParseConfig(config.Location{
+		ConfigFlag:       "../config/testdata/test-config.yml",
+		SkipGlobalConfig: true,
+	})
+	require.NoError(t, err)
+
+	ctx := &context.ProgramContext{
+		Config:       &cfg,
+		ScreenWidth:  100,
+		ScreenHeight: 40,
+		View:         config.PRsView,
+		StartTask:    func(task context.Task) tea.Cmd { return nil },
+	}
+	ctx.Theme = theme.ParseTheme(ctx.Config)
+	ctx.Styles = context.InitStyles(ctx.Theme)
+
+	prSection := prssection.NewModel(
+		0,
+		ctx,
+		config.PrsSectionConfig{Title: "Test", Filters: "is:open"},
+		time.Now(),
+		time.Now(),
+	)
+	prs := make([]prrow.Data, numRows)
+	for i := range prs {
+		prs[i] = prrow.Data{Primary: &data.PullRequestData{Title: "test", State: "OPEN"}}
+	}
+	prSection.Prs = prs
+	prSection.Table.SetRows(prSection.BuildRows())
+
+	sidebarModel := sidebar.NewModel()
+	sidebarModel.IsOpen = sidebarOpen
+	sidebarModel.UpdateProgramContext(ctx)
+
+	m := Model{
+		ctx:              ctx,
+		keys:             keys.Keys,
+		prs:              []section.Section{&prSection},
+		sidebar:          sidebarModel,
+		footer:           footer.NewModel(ctx),
+		tabs:             tabs.NewModel(ctx),
+		prView:           prview.NewModel(ctx),
+		issueSidebar:     issueview.NewModel(ctx),
+		branchSidebar:    branchsidebar.NewModel(ctx),
+		notificationView: notificationview.NewModel(ctx),
+	}
+	m.syncMainContentDimensions()
+	return m
+}
+
+func TestEnterKey_EntersDetailsViewForSelectedRow(t *testing.T) {
+	m := newDetailsViewTestModel(t, 1, false)
+	require.False(t, m.detailsViewState.active)
+
+	newModel, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = newModel.(Model)
+
+	require.True(
+		t, m.detailsViewState.active, "Enter should enter the details view for a selected row",
+	)
+	require.True(t, m.sidebar.IsOpen, "the sidebar/preview should be forced open in details view")
+}
+
+func TestEnterKey_NoOpWithNoRowsInSection(t *testing.T) {
+	m := newDetailsViewTestModel(t, 0, false)
+
+	newModel, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = newModel.(Model)
+
+	require.False(
+		t, m.detailsViewState.active,
+		"Enter with no rows in the section should not enter the details view",
+	)
+}
+
+func TestDetailsView_ScrollKeysScrollPreviewInsteadOfMovingSelection(t *testing.T) {
+	m := newDetailsViewTestModel(t, 3, false)
+	m.sidebar.SetContent(strings.Repeat("line\n", 50))
+
+	newModel, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = newModel.(Model)
+	require.True(t, m.detailsViewState.active)
+
+	currSection := m.getCurrSection()
+	rowBefore := currSection.CurrRow()
+
+	newModel, _ = m.Update(tea.KeyPressMsg{Text: "j"})
+	m = newModel.(Model)
+	require.Equal(t, 1, m.sidebar.YOffset(), "j should scroll the preview down")
+	require.Equal(
+		t, rowBefore, m.getCurrSection().CurrRow(),
+		"j should not move the list selection while in details view",
+	)
+
+	newModel, _ = m.Update(tea.KeyPressMsg{Text: "k"})
+	m = newModel.(Model)
+	require.Equal(t, 0, m.sidebar.YOffset(), "k should scroll the preview up")
+
+	newModel, _ = m.Update(tea.KeyPressMsg{Text: "G"})
+	m = newModel.(Model)
+	require.Greater(t, m.sidebar.YOffset(), 0, "G should jump the preview to the bottom")
+
+	newModel, _ = m.Update(tea.KeyPressMsg{Text: "g"})
+	m = newModel.(Model)
+	require.Equal(t, 0, m.sidebar.YOffset(), "g should jump the preview back to the top")
+}
+
+func TestDetailsView_SectionAndPreviewToggleKeysAreNoOps(t *testing.T) {
+	m := newDetailsViewTestModel(t, 1, false)
+
+	newModel, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = newModel.(Model)
+	require.True(t, m.detailsViewState.active)
+
+	sectionIdBefore := m.currSectionId
+	sidebarOpenBefore := m.sidebar.IsOpen
+	positionBefore := m.positionOverride
+
+	for _, text := range []string{"h", "l", "p", "P"} {
+		newModel, _ = m.Update(tea.KeyPressMsg{Text: text})
+		m = newModel.(Model)
+	}
+
+	require.True(t, m.detailsViewState.active, "details view should remain active")
+	require.Equal(
+		t, sectionIdBefore, m.currSectionId,
+		"section-switch keys should be no-ops in details view",
+	)
+	require.Equal(
+		t, sidebarOpenBefore, m.sidebar.IsOpen,
+		"toggle-preview key should be a no-op in details view",
+	)
+	require.Equal(
+		t, positionBefore, m.positionOverride,
+		"toggle-preview-position key should be a no-op in details view",
+	)
+}
+
+func TestDetailsView_ItemActionStillTriggers(t *testing.T) {
+	m := newDetailsViewTestModel(t, 1, false)
+
+	newModel, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = newModel.(Model)
+	require.True(t, m.detailsViewState.active)
+
+	newModel, _ = m.Update(tea.KeyPressMsg{Text: "x"})
+	m = newModel.(Model)
+
+	currSection := m.getCurrSection()
+	require.True(
+		t,
+		currSection.IsPromptConfirmationFocused(),
+		"a PR action key (close) should still trigger its confirmation prompt while in details view",
+	)
+	require.Equal(t, "close", currSection.GetPromptConfirmationAction())
+}
+
+func TestExitDetailsView_RestoresPriorPreviewState(t *testing.T) {
+	tests := []struct {
+		name          string
+		sidebarOpen   bool
+		expectedAfter bool
+	}{
+		{"preview was closed before entering", false, false},
+		{"preview was open before entering", true, true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			m := newDetailsViewTestModel(t, 1, tc.sidebarOpen)
+
+			newModel, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+			m = newModel.(Model)
+			require.True(t, m.detailsViewState.active)
+			require.True(t, m.sidebar.IsOpen, "sidebar should be forced open while in details view")
+
+			newModel, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+			m = newModel.(Model)
+
+			require.False(t, m.detailsViewState.active, "esc should exit the details view")
+			require.Equal(
+				t,
+				tc.expectedAfter,
+				m.sidebar.IsOpen,
+				"esc should restore the preview's open/closed state from before entering details view",
+			)
+		})
+	}
+}
+
+func TestNotificationView_FirstEnterLoadsContentWithoutEnteringDetailsView(t *testing.T) {
+	cfg, err := config.ParseConfig(config.Location{
+		ConfigFlag:       "../config/testdata/test-config.yml",
+		SkipGlobalConfig: true,
+	})
+	require.NoError(t, err)
+
+	ctx := &context.ProgramContext{
+		Config: &cfg,
+		View:   config.NotificationsView,
+	}
+	ctx.Theme = theme.ParseTheme(ctx.Config)
+	ctx.Styles = context.InitStyles(ctx.Theme)
+
+	sidebarModel := sidebar.NewModel()
+	sidebarModel.UpdateProgramContext(ctx)
+
+	m := Model{
+		ctx:              ctx,
+		keys:             keys.Keys,
+		footer:           footer.NewModel(ctx),
+		prView:           prview.NewModel(ctx),
+		issueSidebar:     issueview.NewModel(ctx),
+		notificationView: notificationview.NewModel(ctx),
+		sidebar:          sidebarModel,
+		tabs:             tabs.NewModel(ctx),
+	}
+
+	notifSec := notificationssection.NewModel(
+		0,
+		ctx,
+		config.NotificationsSectionConfig{},
+		time.Now(),
+	)
+	notifSec.Notifications = []notificationrow.Data{
+		{
+			Notification: data.NotificationData{
+				Id: "test-notification-1",
+				Subject: data.NotificationSubject{
+					Title: "Test PR",
+					Url:   "https://api.github.com/repos/owner/repo/pulls/123",
+					Type:  "PullRequest",
+				},
+				Repository: data.NotificationRepository{FullName: "owner/repo"},
+				Unread:     true,
+			},
+		},
+	}
+	notifSec.Table.SetRows(notifSec.BuildRows())
+	m.notifications = []section.Section{&notifSec}
+
+	require.Nil(t, m.notificationView.GetSubjectPR(), "no subject should be loaded yet")
+
+	newModel, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = newModel.(Model)
+
+	require.False(t, m.detailsViewState.active,
+		"the first Enter should load notification content, not enter the details view")
+	require.NotNil(
+		t,
+		cmd,
+		"the first Enter should trigger loadNotificationContent and return a command",
+	)
+}
+
+func TestNotificationView_EscAfterDetailsViewKeepsContentShown(t *testing.T) {
+	cfg, err := config.ParseConfig(config.Location{
+		ConfigFlag:       "../config/testdata/test-config.yml",
+		SkipGlobalConfig: true,
+	})
+	require.NoError(t, err)
+
+	ctx := &context.ProgramContext{
+		Config: &cfg,
+		View:   config.NotificationsView,
+	}
+	ctx.Theme = theme.ParseTheme(ctx.Config)
+	ctx.Styles = context.InitStyles(ctx.Theme)
+
+	sidebarModel := sidebar.NewModel()
+	sidebarModel.UpdateProgramContext(ctx)
+
+	m := Model{
+		ctx:              ctx,
+		keys:             keys.Keys,
+		footer:           footer.NewModel(ctx),
+		prView:           prview.NewModel(ctx),
+		issueSidebar:     issueview.NewModel(ctx),
+		notificationView: notificationview.NewModel(ctx),
+		sidebar:          sidebarModel,
+		tabs:             tabs.NewModel(ctx),
+	}
+
+	notifSec := notificationssection.NewModel(
+		0,
+		ctx,
+		config.NotificationsSectionConfig{},
+		time.Now(),
+	)
+	notifSec.Notifications = []notificationrow.Data{
+		{
+			Notification: data.NotificationData{
+				Id: "test-notification-1",
+				Subject: data.NotificationSubject{
+					Title: "Test PR",
+					Url:   "https://api.github.com/repos/owner/repo/pulls/123",
+					Type:  "PullRequest",
+				},
+				Repository: data.NotificationRepository{FullName: "owner/repo"},
+				Unread:     true,
+			},
+		},
+	}
+	notifSec.Table.SetRows(notifSec.BuildRows())
+	m.notifications = []section.Section{&notifSec}
+
+	// Simulate that Enter was already pressed once and content loaded.
+	m.notificationView.SetSubjectPR(&prrow.Data{}, "test-notification-1")
+
+	newModel, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = newModel.(Model)
+	require.True(t, m.detailsViewState.active)
+
+	newModel, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+	m = newModel.(Model)
+
+	require.False(t, m.detailsViewState.active, "esc should exit the details view")
+	require.NotNil(t, m.notificationView.GetSubjectPR(),
+		"the notification's PR content should still be shown after exiting the details view")
 }

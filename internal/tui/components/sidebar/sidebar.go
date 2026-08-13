@@ -119,6 +119,14 @@ func (m *Model) ScrollToBottom() {
 	m.viewport.GotoBottom()
 }
 
+func (m *Model) ScrollDown(n int) {
+	m.viewport.ScrollDown(n)
+}
+
+func (m *Model) ScrollUp(n int) {
+	m.viewport.ScrollUp(n)
+}
+
 func (m *Model) YOffset() int {
 	return m.viewport.YOffset()
 }
