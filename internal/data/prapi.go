@@ -88,11 +88,10 @@ type PullRequestData struct {
 		Name string
 	}
 	Repository       Repository
-	Assignees        Assignees            `graphql:"assignees(first: 3)"`
-	Comments         Comments             `graphql:"comments"`
-	ReviewThreads    ReviewThreads        `graphql:"reviewThreads"`
-	Reviews          ReviewsNumber        `graphql:"reviews"`
-	ReviewRequests   ReviewRequestsNumber `graphql:"reviewRequests"`
+	Assignees        Assignees                   `graphql:"assignees(first: 3)"`
+	ReviewThreads    ReviewThreadsWithResolution `graphql:"reviewThreads(last: 100)"`
+	Reviews          ReviewsNumber               `graphql:"reviews"`
+	ReviewRequests   ReviewRequestsNumber        `graphql:"reviewRequests"`
 	IsDraft          bool
 	IsInMergeQueue   bool
 	Commits          LastCommitStatus `graphql:"commits(last: 1)"`
@@ -268,12 +267,11 @@ type ReviewComments struct {
 	TotalCount int
 }
 
-type Comments struct {
+type ReviewThreadsWithResolution struct {
 	TotalCount int
-}
-
-type ReviewThreads struct {
-	TotalCount int
+	Nodes      []struct {
+		IsResolved bool
+	}
 }
 
 type Review struct {
@@ -443,6 +441,19 @@ func (data PullRequestData) GetCreatedAt() time.Time {
 	return data.CreatedAt
 }
 
+// UnresolvedThreadsCount returns the number of review threads that have not
+// been resolved. Only the last 100 threads are fetched, so PRs with more
+// review threads than that will undercount.
+func (data PullRequestData) UnresolvedThreadsCount() int {
+	count := 0
+	for _, node := range data.ReviewThreads.Nodes {
+		if !node.IsResolved {
+			count++
+		}
+	}
+	return count
+}
+
 // ToPullRequestData converts EnrichedPullRequestData to PullRequestData
 // This is useful when we fetch a single PR and need basic PR fields
 func (e EnrichedPullRequestData) ToPullRequestData() PullRequestData {
@@ -467,7 +478,7 @@ func (e EnrichedPullRequestData) ToPullRequestData() PullRequestData {
 		Assignees:         e.Assignees,
 		IsDraft:           e.IsDraft,
 		Labels:            e.Labels,
-		// Note: Comments, ReviewThreads, Reviews, ReviewRequests, Commits
+		// Note: ReviewThreads, Reviews, ReviewRequests, Commits
 		// have different types in EnrichedPullRequestData vs PullRequestData
 		// We leave them as zero values since the enriched data will be used instead
 	}

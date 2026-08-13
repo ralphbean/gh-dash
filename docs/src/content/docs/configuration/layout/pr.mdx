@@ -181,8 +181,9 @@ The heading for this column is `Base`.
 | :------------ | :--- | :------------------------------------------------- |
 | `numComments` | yaml | <Code code={`width: 3`} lang="yaml" frame="none"/> |
 
-This column displays the number of comments left on a PR.
-This is a sum of the direct comments and the number of review threads.
+This column displays the number of unresolved review threads on a PR. It is
+blank when the PR has no unresolved review threads (either because it has
+none, or because they've all been resolved).
 
 The heading for this column is <NerdFontIcon icon="nf-fa-comments_o"/>.
 

@@ -14,7 +14,93 @@ import (
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/table"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/constants"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/context"
+	"github.com/dlvhdr/gh-dash/v4/internal/tui/theme"
 )
+
+func newTestContext(t *testing.T) *context.ProgramContext {
+	t.Helper()
+	cfg, err := config.ParseConfig(config.Location{
+		ConfigFlag:       "../../../config/testdata/test-config.yml",
+		SkipGlobalConfig: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	thm := theme.ParseTheme(&cfg)
+	return &context.ProgramContext{
+		Config: &cfg,
+		Theme:  thm,
+		Styles: context.InitStyles(thm),
+	}
+}
+
+func reviewThreadNodes(resolved ...bool) []struct{ IsResolved bool } {
+	nodes := make([]struct{ IsResolved bool }, len(resolved))
+	for i, r := range resolved {
+		nodes[i] = struct{ IsResolved bool }{IsResolved: r}
+	}
+	return nodes
+}
+
+func TestRenderNumComments(t *testing.T) {
+	tests := []struct {
+		name     string
+		pr       *PullRequest
+		expected string
+	}{
+		{
+			name:     "nil Primary returns dash",
+			pr:       &PullRequest{Data: &Data{Primary: nil}},
+			expected: "-",
+		},
+		{
+			name: "no review threads renders blank",
+			pr: &PullRequest{
+				Data: &Data{Primary: &data.PullRequestData{}},
+			},
+			expected: "",
+		},
+		{
+			name: "only resolved review threads renders blank",
+			pr: &PullRequest{
+				Data: &Data{
+					Primary: &data.PullRequestData{
+						ReviewThreads: data.ReviewThreadsWithResolution{
+							Nodes: reviewThreadNodes(true, true),
+						},
+					},
+				},
+			},
+			expected: "",
+		},
+		{
+			name: "unresolved review threads renders their count",
+			pr: &PullRequest{
+				Data: &Data{
+					Primary: &data.PullRequestData{
+						ReviewThreads: data.ReviewThreadsWithResolution{
+							Nodes: reviewThreadNodes(false, true, false),
+						},
+					},
+				},
+			},
+			expected: "2",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.pr.Ctx = newTestContext(t)
+			result := tt.pr.renderNumComments()
+			if !strings.Contains(result, tt.expected) {
+				t.Errorf("renderNumComments() = %q, want to contain %q", result, tt.expected)
+			}
+			if tt.expected == "" && result != "" {
+				t.Errorf("renderNumComments() = %q, want empty string", result)
+			}
+		})
+	}
+}
 
 func TestGetStatusChecksRollup(t *testing.T) {
 	tests := []struct {

@@ -34,12 +34,13 @@ func (pr *PullRequest) renderNumComments() string {
 		return "-"
 	}
 
+	unresolvedThreads := pr.Data.Primary.UnresolvedThreadsCount()
+	if unresolvedThreads == 0 {
+		return ""
+	}
+
 	numCommentsStyle := pr.Ctx.Styles.Common.FaintTextStyle
-	return numCommentsStyle.Render(
-		fmt.Sprintf(
-			"%d",
-			pr.Data.Primary.Comments.TotalCount+pr.Data.Primary.ReviewThreads.TotalCount,
-		))
+	return numCommentsStyle.Render(fmt.Sprintf("%d", unresolvedThreads))
 }
 
 func (pr *PullRequest) renderReviewStatus() string {
