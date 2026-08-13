@@ -47,6 +47,9 @@ You can write your comment as GitHub-flavored Markdown in the input.
 
 To submit the comment on the PR, press <kbd>Ctrl</kbd>+<kbd>d</kbd>. To cancel the comment instead, press <kbd>Ctrl</kbd>+<kbd>c</kbd> or <kbd>Esc</kbd>.
 
+While [triaging review threads](#t---triage-review-threads), <kbd>c</kbd> replies to the current
+thread instead of commenting on the PR.
+
 ## `C` - Checkout PR
 
 Press <kbd>C</kbd> to checkout the PR locally. The dashboard checks for the `repoPaths` key in your
@@ -75,6 +78,26 @@ By default `dash` only displays the first 5 lines.
 
 Press <kbd>m</kbd> to merge the PR. When you do, the dashboard uses the `gh pr merge` command to
 merge the PR.
+
+## `T` - Triage Review Threads
+
+Press <kbd>T</kbd> while the [details view](/getting-started/keybindings/preview/#enter---view-details)
+is active to triage the PR's unresolved review threads. The dashboard fetches the PR's current
+review threads and replaces the details view with a queue of unresolved threads, showing one at a
+time along with its file/line, diff hunk, and existing comments.
+
+While triaging:
+
+- Press <kbd>n</kbd> or <kbd>N</kbd> to move to the next or previous unresolved thread. The queue
+  wraps around at both ends.
+- Press <kbd>c</kbd> to reply to the current thread (see [`c` - Comment on PR](#c---comment-on-pr)).
+- Press <kbd>r</kbd> to resolve the current thread. When you do, the dashboard uses the
+  `resolveReviewThread` GraphQL mutation, removes the thread from the queue, and shows the next
+  remaining thread. If no threads remain, triage exits automatically.
+- Press <kbd>Esc</kbd> to exit triage and return to the details view. Press <kbd>Esc</kbd> again to
+  exit the details view.
+
+If the PR has no unresolved review threads, triage displays an empty state instead of a thread.
 
 ## `u` - Update PR
 

@@ -10,7 +10,9 @@ import (
 	"github.com/dlvhdr/gh-dash/v4/internal/data"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/prompt"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/prrow"
+	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/search"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/section"
+	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/tasks"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/context"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/theme"
 )
@@ -40,6 +42,7 @@ func newTestModel(action string) Model {
 			IsPromptConfirmationShown: true,
 			PromptConfirmationAction:  action,
 			PromptConfirmationBox:     prompt.NewModel(ctx),
+			SearchBar:                 search.NewModel(ctx, search.SearchOptions{}),
 		},
 		Prs: []prrow.Data{
 			{Primary: &data.PullRequestData{Number: 42}},
@@ -143,4 +146,36 @@ func TestConfirmation_AllActions(t *testing.T) {
 				"explicit y should confirm for action %q", action)
 		})
 	}
+}
+
+func TestUpdatePRMsg_ResolvedThreadIdMarksMatchingThreadResolved(t *testing.T) {
+	m := newTestModel("")
+	m.Prs[0].Enriched.ReviewThreads.Nodes = []data.ReviewThreadWithComments{
+		{Id: "thread-1", IsResolved: false},
+		{Id: "thread-2", IsResolved: false},
+	}
+	threadId := "thread-2"
+
+	_, _ = m.Update(tasks.UpdatePRMsg{PrNumber: 42, ResolvedThreadId: &threadId})
+
+	require.False(t, m.Prs[0].Enriched.ReviewThreads.Nodes[0].IsResolved)
+	require.True(t, m.Prs[0].Enriched.ReviewThreads.Nodes[1].IsResolved)
+}
+
+func TestUpdatePRMsg_NewThreadReplyAppendsCommentToMatchingThread(t *testing.T) {
+	m := newTestModel("")
+	m.Prs[0].Enriched.ReviewThreads.Nodes = []data.ReviewThreadWithComments{
+		{Id: "thread-1"},
+		{Id: "thread-2"},
+	}
+	reply := tasks.ThreadReply{
+		ThreadId: "thread-2",
+		Comment:  data.ReviewComment{Body: "sounds good"},
+	}
+
+	_, _ = m.Update(tasks.UpdatePRMsg{PrNumber: 42, NewThreadReply: &reply})
+
+	require.Empty(t, m.Prs[0].Enriched.ReviewThreads.Nodes[0].Comments.Nodes)
+	require.Len(t, m.Prs[0].Enriched.ReviewThreads.Nodes[1].Comments.Nodes, 1)
+	require.Equal(t, "sounds good", m.Prs[0].Enriched.ReviewThreads.Nodes[1].Comments.Nodes[0].Body)
 }

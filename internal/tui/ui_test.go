@@ -2425,6 +2425,117 @@ func TestDetailsView_ItemActionStillTriggers(t *testing.T) {
 	require.Equal(t, "close", currSection.GetPromptConfirmationAction())
 }
 
+// newTriageTestModel enters the PR details view and seeds the triage queue
+// directly via prview.SetReviewThreads, bypassing the real network fetch
+// that EnterThreadTriage's returned command would otherwise perform.
+func newTriageTestModel(t *testing.T, threads []data.ReviewThreadWithComments) Model {
+	t.Helper()
+	m := newDetailsViewTestModel(t, 1, false)
+
+	newModel, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = newModel.(Model)
+	require.True(t, m.detailsViewState.active)
+
+	// Seed prView with the current row's data, mirroring what
+	// onViewedRowChanged does during normal navigation before the details
+	// view is ever entered.
+	m.syncSidebar()
+
+	m.prView.SetReviewThreads(prview.ReviewThreadsFetchedMsg{Threads: threads})
+	m.syncSidebar()
+	require.True(t, m.prView.IsTriagingThreads())
+	return m
+}
+
+func TestTriageThreads_EntersTriageOnlyFromDetailsView(t *testing.T) {
+	m := newDetailsViewTestModel(t, 1, false)
+	require.False(t, m.detailsViewState.active)
+
+	newModel, _ := m.Update(tea.KeyPressMsg{Text: "T"})
+	m = newModel.(Model)
+
+	require.False(t, m.prView.IsTriagingThreads(), "T should be a no-op outside the details view")
+
+	newModel, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = newModel.(Model)
+	require.True(t, m.detailsViewState.active)
+
+	newModel, cmd := m.Update(tea.KeyPressMsg{Text: "T"})
+	m = newModel.(Model)
+
+	require.NotNil(t, cmd, "T should fetch review threads when in the details view")
+}
+
+func TestTriageThreads_NextPrevMoveBetweenThreadsAndWrap(t *testing.T) {
+	m := newTriageTestModel(t, []data.ReviewThreadWithComments{
+		{Id: "t1", Path: "a.go", Line: 1},
+		{Id: "t2", Path: "b.go", Line: 1},
+	})
+	require.Contains(t, m.sidebar.View(), "a.go")
+
+	newModel, _ := m.Update(tea.KeyPressMsg{Text: "n"})
+	m = newModel.(Model)
+	require.Contains(t, m.sidebar.View(), "b.go", "n should move to the next thread")
+
+	newModel, _ = m.Update(tea.KeyPressMsg{Text: "n"})
+	m = newModel.(Model)
+	require.Contains(t, m.sidebar.View(), "a.go", "n from the last thread should wrap to the first")
+
+	newModel, _ = m.Update(tea.KeyPressMsg{Text: "N"})
+	m = newModel.(Model)
+	require.Contains(t, m.sidebar.View(), "b.go",
+		"N from the first thread should wrap to the last thread")
+}
+
+func TestTriageThreads_EscExitsTriageBeforeDetailsView(t *testing.T) {
+	m := newTriageTestModel(t, []data.ReviewThreadWithComments{{Id: "t1"}})
+
+	newModel, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+	m = newModel.(Model)
+
+	require.False(t, m.prView.IsTriagingThreads(), "esc should exit triage first")
+	require.True(t, m.detailsViewState.active, "esc should not exit the details view yet")
+
+	newModel, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+	m = newModel.(Model)
+
+	require.False(t, m.detailsViewState.active, "a second esc should exit the details view")
+}
+
+func TestTriageThreads_ItemActionsAreNoOpsWhileTriaging(t *testing.T) {
+	m := newTriageTestModel(t, []data.ReviewThreadWithComments{{Id: "t1"}})
+
+	newModel, _ := m.Update(tea.KeyPressMsg{Text: "x"})
+	m = newModel.(Model)
+
+	currSection := m.getCurrSection()
+	require.False(
+		t,
+		currSection.IsPromptConfirmationFocused(),
+		"item actions like close should be no-ops while triaging",
+	)
+	require.True(t, m.prView.IsTriagingThreads(), "triaging should remain active")
+}
+
+func TestTriageThreads_HelpToggleStillWorks(t *testing.T) {
+	zone.NewGlobal()
+	zone.SetEnabled(false)
+
+	m := newTriageTestModel(t, []data.ReviewThreadWithComments{{Id: "t1"}})
+	require.False(t, m.footer.ShowAll)
+
+	newModel, _ := m.Update(tea.KeyPressMsg{Text: "?"})
+	m = newModel.(Model)
+
+	require.True(t, m.footer.ShowAll, "? should toggle help while triaging")
+	require.True(t, m.prView.IsTriagingThreads(), "triaging should remain active")
+
+	newModel, _ = m.Update(tea.KeyPressMsg{Text: "?"})
+	m = newModel.(Model)
+
+	require.False(t, m.footer.ShowAll, "? should toggle help off again")
+}
+
 func TestExitDetailsView_RestoresPriorPreviewState(t *testing.T) {
 	tests := []struct {
 		name          string

@@ -105,6 +105,33 @@ func TestUnresolvedThreadsCount(t *testing.T) {
 	}
 }
 
+func TestReviewThreadWithComments_Fields(t *testing.T) {
+	// FetchReviewThreads itself talks to GitHub's GraphQL API and isn't
+	// unit-tested here (matching FetchPullRequest/FetchPullRequests, which
+	// have no direct unit tests either); the queue-building logic that
+	// excludes IsResolved: true threads is exercised where it lives, in the
+	// prview package. This just pins down the struct's new fields.
+	thread := ReviewThreadWithComments{
+		Id:               "thread-1",
+		IsResolved:       true,
+		ViewerCanReply:   true,
+		ViewerCanResolve: false,
+		Path:             "main.go",
+		Line:             42,
+		Comments: ReviewComments{
+			Nodes: []ReviewComment{
+				{Body: "looks good", DiffHunk: "@@ -1,2 +1,2 @@\n-old\n+new"},
+			},
+		},
+	}
+
+	require.True(t, thread.IsResolved)
+	require.True(t, thread.ViewerCanReply)
+	require.False(t, thread.ViewerCanResolve)
+	require.Equal(t, "main.go", thread.Path)
+	require.Equal(t, "@@ -1,2 +1,2 @@\n-old\n+new", thread.Comments.Nodes[0].DiffHunk)
+}
+
 func TestSetClient(t *testing.T) {
 	// Save original state
 	originalClient := client

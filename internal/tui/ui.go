@@ -247,6 +247,52 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// below unchanged.
 		if m.detailsViewState.active {
 			switch {
+			case m.prView.IsTriagingThreads() && key.Matches(msg, m.keys.Esc):
+				m.prView.ExitThreadTriage()
+				m.syncSidebar()
+				return m, nil
+
+			case m.prView.IsTriagingThreads() && key.Matches(msg, keys.PRKeys.TriageNextThread):
+				m.prView.NextThread()
+				m.syncSidebar()
+				return m, nil
+
+			case m.prView.IsTriagingThreads() && key.Matches(msg, keys.PRKeys.TriagePrevThread):
+				m.prView.PrevThread()
+				m.syncSidebar()
+				return m, nil
+
+			case m.prView.IsTriagingThreads() && key.Matches(msg, keys.PRKeys.Comment):
+				return m, m.prView.StartThreadReply()
+
+			case m.prView.IsTriagingThreads() && key.Matches(msg, keys.PRKeys.TriageResolve):
+				return m, m.prView.ResolveCurrentThread()
+
+			case m.prView.IsTriagingThreads() && key.Matches(msg, m.keys.Down):
+				m.sidebar.ScrollDown(1)
+				return m, nil
+
+			case m.prView.IsTriagingThreads() && key.Matches(msg, m.keys.Up):
+				m.sidebar.ScrollUp(1)
+				return m, nil
+
+			case m.prView.IsTriagingThreads() && key.Matches(msg, m.keys.FirstLine):
+				m.sidebar.ScrollToTop()
+				return m, nil
+
+			case m.prView.IsTriagingThreads() && key.Matches(msg, m.keys.LastLine):
+				m.sidebar.ScrollToBottom()
+				return m, nil
+
+			case m.prView.IsTriagingThreads() && key.Matches(msg, m.keys.Help):
+				m.footer.ShowAll = !m.footer.ShowAll
+				m.syncMainContentDimensions()
+				return m, nil
+
+			case m.prView.IsTriagingThreads():
+				// catch-all: swallow anything else (approve, merge, label, ...) while triaging
+				return m, nil
+
 			case key.Matches(msg, m.keys.Down):
 				m.sidebar.ScrollDown(1)
 				return m, nil
@@ -531,6 +577,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.prView.SetSummaryViewMore()
 				m.syncSidebar()
 				return m, nil
+
+			case key.Matches(msg, keys.PRKeys.TriageThreads):
+				if m.detailsViewState.active {
+					return m, m.prView.EnterThreadTriage()
+				}
 			}
 		case m.ctx.View == config.IssuesView:
 			switch {
@@ -814,6 +865,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, syncCmd)
 		} else {
 			log.Error("failed enriching pr", "err", msg.Err)
+		}
+
+	case prview.ReviewThreadsFetchedMsg:
+		if msg.Err == nil {
+			m.prView.SetReviewThreads(msg)
+			syncCmd := m.syncSidebar()
+			cmds = append(cmds, syncCmd)
+		} else {
+			log.Error("failed fetching review threads", "err", msg.Err)
 		}
 
 	case notificationPRFetchedMsg:

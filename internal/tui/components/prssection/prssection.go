@@ -200,6 +200,23 @@ func (m *Model) Update(msg tea.Msg) (section.Section, tea.Cmd) {
 				currPr.Primary.State = "MERGED"
 				currPr.Primary.Mergeable = ""
 			}
+			if msg.ResolvedThreadId != nil {
+				for j, thread := range currPr.Enriched.ReviewThreads.Nodes {
+					if thread.Id == *msg.ResolvedThreadId {
+						currPr.Enriched.ReviewThreads.Nodes[j].IsResolved = true
+						break
+					}
+				}
+			}
+			if msg.NewThreadReply != nil {
+				for j, thread := range currPr.Enriched.ReviewThreads.Nodes {
+					if thread.Id == msg.NewThreadReply.ThreadId {
+						currPr.Enriched.ReviewThreads.Nodes[j].Comments.Nodes = append(
+							thread.Comments.Nodes, msg.NewThreadReply.Comment)
+						break
+					}
+				}
+			}
 			m.Prs[i] = currPr
 			m.SetIsLoading(false)
 			m.Table.SetRows(m.BuildRows())

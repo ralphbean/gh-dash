@@ -40,6 +40,7 @@ type Model struct {
 	carousel        carousel.Model
 	editor          cmpcontroller.Controller
 	summaryViewMore bool
+	threadTriage    threadTriageState
 }
 
 var tabs = []string{" Overview", " Activity", " Commits", " Checks", " Files Changed"}
@@ -108,6 +109,13 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				return m, m.label(labels)
 			}
 			return m, nil
+
+		case cmpcontroller.ModeThreadReply:
+			thread, ok := m.currentThread()
+			if ok && len(strings.TrimSpace(value)) != 0 {
+				return m, tasks.ReplyToReviewThread(m.ctx, sid, m.pr.Data.Primary, thread.Id, value)
+			}
+			return m, nil
 		}
 	}
 
@@ -130,6 +138,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 func (m Model) View() string {
 	if !m.hasData() {
 		return ""
+	}
+
+	if m.threadTriage.active {
+		return m.viewThreadTriage()
 	}
 
 	body := strings.Builder{}

@@ -260,6 +260,7 @@ type ReviewComment struct {
 	UpdatedAt time.Time
 	StartLine int
 	Line      int
+	DiffHunk  string
 }
 
 type ReviewComments struct {
@@ -292,16 +293,21 @@ type Reviews struct {
 	Nodes      []Review
 }
 
+type ReviewThreadWithComments struct {
+	Id               string
+	IsOutdated       bool
+	IsResolved       bool
+	ViewerCanReply   bool
+	ViewerCanResolve bool
+	OriginalLine     int
+	StartLine        int
+	Line             int
+	Path             string
+	Comments         ReviewComments `graphql:"comments(first: 20)"`
+}
+
 type ReviewThreadsWithComments struct {
-	Nodes []struct {
-		Id           string
-		IsOutdated   bool
-		OriginalLine int
-		StartLine    int
-		Line         int
-		Path         string
-		Comments     ReviewComments `graphql:"comments(first: 20)"`
-	}
+	Nodes []ReviewThreadWithComments
 }
 
 type ChangedFile struct {
@@ -610,4 +616,42 @@ func FetchPullRequest(prUrl string) (EnrichedPullRequestData, error) {
 	log.Info("Successfully fetched PR", "url", prUrl)
 
 	return queryResult.Resource.PullRequest, nil
+}
+
+// FetchReviewThreads fetches just a pull request's review threads (id, path,
+// line, resolution/permission flags, and comments), independent of the full
+// enrichment query performed by FetchPullRequest. It always queries GitHub
+// directly, bypassing any cached enrichment data, so callers get the
+// PR's current thread state.
+func FetchReviewThreads(prUrl string) ([]ReviewThreadWithComments, error) {
+	var err error
+	if client == nil {
+		client, err = gh.DefaultGraphQLClient()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var queryResult struct {
+		Resource struct {
+			PullRequest struct {
+				ReviewThreads ReviewThreadsWithComments `graphql:"reviewThreads(last: 50)"`
+			} `graphql:"... on PullRequest"`
+		} `graphql:"resource(url: $url)"`
+	}
+	parsedUrl, err := url.Parse(prUrl)
+	if err != nil {
+		return nil, err
+	}
+	variables := map[string]any{
+		"url": githubv4.URI{URL: parsedUrl},
+	}
+	log.Debug("Fetching review threads", "url", prUrl)
+	err = client.Query("FetchReviewThreads", &queryResult, variables)
+	if err != nil {
+		return nil, err
+	}
+	log.Info("Successfully fetched review threads", "url", prUrl)
+
+	return queryResult.Resource.PullRequest.ReviewThreads.Nodes, nil
 }

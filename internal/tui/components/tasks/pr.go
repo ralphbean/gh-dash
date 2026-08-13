@@ -29,6 +29,14 @@ type UpdatePRMsg struct {
 	AddedAssignees   *data.Assignees
 	RemovedAssignees *data.Assignees
 	Labels           *data.PRLabels
+	ResolvedThreadId *string
+	NewThreadReply   *ThreadReply
+}
+
+// ThreadReply is a reply posted to a specific review thread.
+type ThreadReply struct {
+	ThreadId string
+	Comment  data.ReviewComment
 }
 
 type UpdateBranchMsg struct {

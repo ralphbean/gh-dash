@@ -30,6 +30,10 @@ type PRKeyMap struct {
 	ToggleSmartFiltering key.Binding
 	ViewIssues           key.Binding
 	Snooze               key.Binding
+	TriageThreads        key.Binding
+	TriageNextThread     key.Binding
+	TriagePrevThread     key.Binding
+	TriageResolve        key.Binding
 }
 
 var PRKeys = PRKeyMap{
@@ -113,6 +117,22 @@ var PRKeys = PRKeyMap{
 		key.WithKeys("z"),
 		key.WithHelp("z", "snooze"),
 	),
+	TriageThreads: key.NewBinding(
+		key.WithKeys("T"),
+		key.WithHelp("T", "triage review threads"),
+	),
+	TriageNextThread: key.NewBinding(
+		key.WithKeys("n"),
+		key.WithHelp("n", "next thread"),
+	),
+	TriagePrevThread: key.NewBinding(
+		key.WithKeys("N"),
+		key.WithHelp("N", "previous thread"),
+	),
+	TriageResolve: key.NewBinding(
+		key.WithKeys("r"),
+		key.WithHelp("r", "resolve thread"),
+	),
 }
 
 func PRFullHelp() []key.Binding {
@@ -136,6 +156,10 @@ func PRFullHelp() []key.Binding {
 		PRKeys.ToggleSmartFiltering,
 		PRKeys.ViewIssues,
 		PRKeys.Snooze,
+		PRKeys.TriageThreads,
+		PRKeys.TriageNextThread,
+		PRKeys.TriagePrevThread,
+		PRKeys.TriageResolve,
 	}
 }
 
@@ -204,6 +228,14 @@ func rebindPRKeys(keys []config.Keybinding) error {
 			key = &PRKeys.SummaryViewMore
 		case "snooze":
 			key = &PRKeys.Snooze
+		case "triageThreads":
+			key = &PRKeys.TriageThreads
+		case "triageNextThread":
+			key = &PRKeys.TriageNextThread
+		case "triagePrevThread":
+			key = &PRKeys.TriagePrevThread
+		case "triageResolve":
+			key = &PRKeys.TriageResolve
 		default:
 			return fmt.Errorf("unknown built-in pr key: '%s'", prKey.Builtin)
 		}
