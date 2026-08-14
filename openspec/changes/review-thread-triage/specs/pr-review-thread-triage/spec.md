@@ -133,6 +133,12 @@ unresolved thread.
 - **THEN** the system SHALL exit the triage workflow and return to the
   pull request's normal details view
 
+#### Scenario: List view unresolved-thread count reflects resolution
+- **WHEN** the user resolves a thread while triaging and later returns to
+  the PRs list view
+- **THEN** the list view's unresolved review-thread count for that pull
+  request SHALL reflect the resolution without requiring a manual refresh
+
 ### Requirement: Exiting the triage workflow
 Pressing the exit key while in the triage workflow SHALL return the user to
 the pull request's normal details view, on the same tab that was showing

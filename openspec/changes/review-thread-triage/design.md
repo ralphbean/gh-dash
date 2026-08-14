@@ -246,9 +246,19 @@ func ResolveReviewThread(ctx *context.ProgramContext, section SectionIdentifier,
 ```
 `prssection.go`'s existing `case tasks.UpdatePRMsg:` switch gains two
 branches: `ResolvedThreadId` marks the matching thread's `IsResolved` true
-in `currPr.Enriched.ReviewThreads.Nodes` (which also updates what the
-`pr-list-columns` unresolved-count column shows on the next render);
-`NewThreadReply` appends the reply to that thread's `Comments.Nodes`.
+in `currPr.Enriched.ReviewThreads.Nodes`; `NewThreadReply` appends the
+reply to that thread's `Comments.Nodes`.
+
+**Correction:** `Enriched.ReviewThreads` and `Primary.ReviewThreads` are
+separate query results - the `pr-list-columns` unresolved-count column
+reads `Primary.ReviewThreads` (`ReviewThreadsWithResolution`, which has no
+per-thread `Id`), not `Enriched.ReviewThreads`, so the above alone does
+NOT update what the list column shows. The `ResolvedThreadId` branch also
+flips one `IsResolved: false` node in `currPr.Primary.ReviewThreads.Nodes`
+to `true` - since the column only needs the aggregate unresolved count,
+not per-thread identity, this keeps both in sync without a second API
+call or adding an `Id` field to `ReviewThreadsWithResolution` that nothing
+else needs.
 
 Alternatives considered:
 - Calling the GraphQL client's `.Mutate(...)` directly from `internal/data`

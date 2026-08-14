@@ -166,6 +166,26 @@ func TestUpdatePRMsg_ResolvedThreadIdMarksMatchingThreadResolved(t *testing.T) {
 	require.True(t, m.Prs[0].Enriched.ReviewThreads.Nodes[1].IsResolved)
 }
 
+func TestUpdatePRMsg_ResolvedThreadIdDecrementsPrimaryUnresolvedCount(t *testing.T) {
+	m := newTestModel("")
+	m.Prs[0].Enriched.ReviewThreads.Nodes = []data.ReviewThreadWithComments{
+		{Id: "thread-1", IsResolved: false},
+	}
+	m.Prs[0].Primary.ReviewThreads = data.ReviewThreadsWithResolution{
+		Nodes: []struct{ IsResolved bool }{
+			{IsResolved: false},
+			{IsResolved: false},
+		},
+	}
+	before := m.Prs[0].Primary.UnresolvedThreadsCount()
+	threadId := "thread-1"
+
+	_, _ = m.Update(tasks.UpdatePRMsg{PrNumber: 42, ResolvedThreadId: &threadId})
+
+	require.Equal(t, before-1, m.Prs[0].Primary.UnresolvedThreadsCount(),
+		"resolving a thread should decrement the list view's unresolved-thread count")
+}
+
 func TestUpdatePRMsg_NewThreadReplyAppendsCommentToMatchingThread(t *testing.T) {
 	m := newTestModel("")
 	m.Prs[0].Enriched.ReviewThreads.Nodes = []data.ReviewThreadWithComments{

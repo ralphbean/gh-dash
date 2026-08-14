@@ -222,6 +222,12 @@ func (m *Model) Update(msg tea.Msg) (section.Section, tea.Cmd) {
 						break
 					}
 				}
+				for j, thread := range currPr.Primary.ReviewThreads.Nodes {
+					if !thread.IsResolved {
+						currPr.Primary.ReviewThreads.Nodes[j].IsResolved = true
+						break
+					}
+				}
 			}
 			if msg.NewThreadReply != nil {
 				for j, thread := range currPr.Enriched.ReviewThreads.Nodes {

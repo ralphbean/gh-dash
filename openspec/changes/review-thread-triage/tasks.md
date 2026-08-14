@@ -42,6 +42,14 @@
       comment to the matching thread's `Comments.Nodes`.
 - [x] 3.3 Add/extend `prssection_test.go` coverage for both new
       `UpdatePRMsg` branches.
+- [x] 3.4 Fix: in the `ResolvedThreadId` branch, also flip one
+      `IsResolved: false` node in `currPr.Primary.ReviewThreads.Nodes` to
+      `true`, so the `pr-list-columns` unresolved-count column reflects
+      the resolution on return to the list view, per design.md Decision
+      5's correction.
+- [x] 3.5 Add/extend `prssection_test.go` coverage: after
+      `ResolvedThreadId`, `Primary.ReviewThreads`'s unresolved count (via
+      `UnresolvedThreadsCount()`) has decremented by one.
 
 ## 4. Triage state and queue on `prview.Model`
 
