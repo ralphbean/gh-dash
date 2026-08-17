@@ -220,10 +220,17 @@ func (m *Model) viewThreadTriage() string {
 
 func (m *Model) renderThreadTriageHeader(thread data.ReviewThreadWithComments) string {
 	width := m.getIndentedContentWidth()
-	position := fmt.Sprintf("Thread %d of %d", m.threadTriage.currentIndex+1, len(m.threadTriage.threads))
+	position := fmt.Sprintf(
+		"Thread %d of %d",
+		m.threadTriage.currentIndex+1,
+		len(m.threadTriage.threads),
+	)
 	location := fmt.Sprintf("%s#L%d", thread.Path, thread.Line)
 	if thread.IsOutdated {
-		location += "  " + lipgloss.NewStyle().Bold(true).Foreground(m.ctx.Theme.WarningText).Render("OUTDATED")
+		location += "  " + lipgloss.NewStyle().
+			Bold(true).
+			Foreground(m.ctx.Theme.WarningText).
+			Render("OUTDATED")
 	}
 	return lipgloss.JoinVertical(
 		lipgloss.Left,

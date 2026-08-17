@@ -61,7 +61,12 @@ func TestEnterThreadTriage_ReturnsCommandRegardlessOfEnrichment(t *testing.T) {
 
 		cmd := m.EnterThreadTriage()
 
-		require.NotNil(t, cmd, "EnterThreadTriage should always refetch, regardless of IsEnriched=%v", enriched)
+		require.NotNil(
+			t,
+			cmd,
+			"EnterThreadTriage should always refetch, regardless of IsEnriched=%v",
+			enriched,
+		)
 	}
 }
 
@@ -124,10 +129,20 @@ func TestNextPrevThread_WrapAndLeaveStateUnchanged(t *testing.T) {
 
 	m.NextThread()
 	m.NextThread()
-	require.Equal(t, 0, m.threadTriage.currentIndex, "next from the last thread should wrap to the first")
+	require.Equal(
+		t,
+		0,
+		m.threadTriage.currentIndex,
+		"next from the last thread should wrap to the first",
+	)
 
 	m.PrevThread()
-	require.Equal(t, 2, m.threadTriage.currentIndex, "prev from the first thread should wrap to the last")
+	require.Equal(
+		t,
+		2,
+		m.threadTriage.currentIndex,
+		"prev from the first thread should wrap to the last",
+	)
 
 	for _, thread := range m.threadTriage.threads {
 		require.False(t, thread.IsResolved)
@@ -144,7 +159,12 @@ func TestResolveCurrentThread_NotAllowedIsNoOp(t *testing.T) {
 	cmd := m.ResolveCurrentThread()
 
 	require.Nil(t, cmd)
-	require.Len(t, m.threadTriage.threads, 1, "thread should remain in the queue when resolve isn't allowed")
+	require.Len(
+		t,
+		m.threadTriage.threads,
+		1,
+		"thread should remain in the queue when resolve isn't allowed",
+	)
 }
 
 func TestResolveCurrentThread_AllowedRemovesFromQueueAndAdvances(t *testing.T) {
@@ -157,7 +177,11 @@ func TestResolveCurrentThread_AllowedRemovesFromQueueAndAdvances(t *testing.T) {
 	cmd := m.ResolveCurrentThread()
 
 	require.NotNil(t, cmd)
-	require.True(t, m.IsTriagingThreads(), "triage should remain active with threads left in the queue")
+	require.True(
+		t,
+		m.IsTriagingThreads(),
+		"triage should remain active with threads left in the queue",
+	)
 	require.Len(t, m.threadTriage.threads, 1)
 	require.Equal(t, "t2", m.threadTriage.threads[0].Id)
 	require.Equal(t, 0, m.threadTriage.currentIndex)
@@ -214,8 +238,18 @@ func TestSubmitThreadReply_PostsToCurrentThreadWithoutAdvancing(t *testing.T) {
 	m = newM
 
 	require.NotNil(t, submitCmd, "submitting a non-empty reply should return a command")
-	require.Equal(t, 0, m.threadTriage.currentIndex, "replying should not advance to the next thread")
-	require.Len(t, m.threadTriage.threads, 2, "replying should not remove the thread from the queue")
+	require.Equal(
+		t,
+		0,
+		m.threadTriage.currentIndex,
+		"replying should not advance to the next thread",
+	)
+	require.Len(
+		t,
+		m.threadTriage.threads,
+		2,
+		"replying should not remove the thread from the queue",
+	)
 }
 
 func TestExitThreadTriage_RestoresPriorTab(t *testing.T) {
