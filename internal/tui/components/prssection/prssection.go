@@ -315,6 +315,10 @@ func GetSectionColumns(
 		dLayout.ReviewStatus,
 		sLayout.ReviewStatus,
 	)
+	reviewStatusBotLayout := config.MergeColumnConfigs(
+		dLayout.ReviewStatusBot,
+		sLayout.ReviewStatusBot,
+	)
 	stateLayout := config.MergeColumnConfigs(dLayout.State, sLayout.State)
 	ciLayout := config.MergeColumnConfigs(dLayout.Ci, sLayout.Ci)
 	labelsLayout := config.MergeColumnConfigs(dLayout.Labels, sLayout.Labels)
@@ -362,6 +366,11 @@ func GetSectionColumns(
 				Title:  "󰯢",
 				Width:  utils.IntPtr(4),
 				Hidden: reviewStatusLayout.Hidden,
+			},
+			{
+				Title:  constants.RobotIcon,
+				Width:  utils.IntPtr(4),
+				Hidden: reviewStatusBotLayout.Hidden,
 			},
 			{
 				Title:  "",
@@ -437,6 +446,11 @@ func GetSectionColumns(
 			Title:  "󰯢",
 			Width:  utils.IntPtr(4),
 			Hidden: reviewStatusLayout.Hidden,
+		},
+		{
+			Title:  constants.RobotIcon,
+			Width:  utils.IntPtr(4),
+			Hidden: reviewStatusBotLayout.Hidden,
 		},
 		{
 			Title:  "",

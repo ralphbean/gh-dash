@@ -36,6 +36,7 @@ const (
 	EmptyIcon            = ""
 	FailureIcon          = "󰅙"
 	PersonIcon           = ""
+	RobotIcon            = "󰚩" // nf-md-robot
 	SuccessIcon          = ""
 	TeamIcon             = ""
 	WaitingIcon          = ""

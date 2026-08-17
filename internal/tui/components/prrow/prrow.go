@@ -44,30 +44,42 @@ func (pr *PullRequest) renderNumComments() string {
 	return numCommentsStyle.Render(fmt.Sprintf("%d", unresolvedThreads))
 }
 
-func (pr *PullRequest) renderReviewStatus() string {
+// renderReviewStatusFor renders the review-status icon for either the human
+// or bot group of a PR's reviews. See data.ComputeReviewStatus for how a
+// group's aggregate status is determined.
+func (pr *PullRequest) renderReviewStatusFor(bot bool) string {
 	if pr.Data.Primary == nil {
 		return "-"
 	}
 	reviewCellStyle := pr.getTextStyle()
-	if pr.Data.Primary.ReviewDecision == "APPROVED" {
-		reviewCellStyle = reviewCellStyle.Foreground(
-			pr.Ctx.Theme.SuccessText,
-		)
-		return reviewCellStyle.Render(constants.ApprovedIcon)
+
+	human, botReviews := data.PartitionByBotAuthor(
+		data.ReviewSummariesFromReviewsWithAuthorType(pr.Data.Primary.Reviews),
+	)
+	group := human
+	if bot {
+		group = botReviews
 	}
 
-	if pr.Data.Primary.ReviewDecision == "CHANGES_REQUESTED" {
-		reviewCellStyle = reviewCellStyle.Foreground(
-			pr.Ctx.Theme.ErrorText,
-		)
-		return reviewCellStyle.Render(constants.ChangesRequestedIcon)
-	}
-
-	if pr.Data.Primary.Reviews.TotalCount > 0 {
+	switch data.ComputeReviewStatus(group) {
+	case "APPROVED":
+		return reviewCellStyle.Foreground(pr.Ctx.Theme.SuccessText).Render(constants.ApprovedIcon)
+	case "CHANGES_REQUESTED":
+		return reviewCellStyle.Foreground(pr.Ctx.Theme.ErrorText).
+			Render(constants.ChangesRequestedIcon)
+	case "COMMENTED":
 		return reviewCellStyle.Render(pr.Ctx.Styles.Common.CommentGlyph)
+	default:
+		return reviewCellStyle.Render(pr.Ctx.Styles.Common.WaitingGlyph)
 	}
+}
 
-	return reviewCellStyle.Render(pr.Ctx.Styles.Common.WaitingGlyph)
+func (pr *PullRequest) renderReviewStatusHuman() string {
+	return pr.renderReviewStatusFor(false)
+}
+
+func (pr *PullRequest) renderReviewStatusBot() string {
+	return pr.renderReviewStatusFor(true)
 }
 
 func (pr *PullRequest) renderStar() string {
@@ -409,7 +421,8 @@ func (pr *PullRequest) ToTableRow(isSelected bool) table.Row {
 			pr.renderAssignees(),
 			pr.renderBaseName(),
 			pr.renderNumComments(),
-			pr.renderReviewStatus(),
+			pr.renderReviewStatusHuman(),
+			pr.renderReviewStatusBot(),
 			pr.renderCiStatus(),
 			pr.RenderLines(isSelected),
 			pr.renderUpdateAt(),
@@ -426,7 +439,8 @@ func (pr *PullRequest) ToTableRow(isSelected bool) table.Row {
 		pr.renderAssignees(),
 		pr.renderBaseName(),
 		pr.renderNumComments(),
-		pr.renderReviewStatus(),
+		pr.renderReviewStatusHuman(),
+		pr.renderReviewStatusBot(),
 		pr.renderCiStatus(),
 		pr.RenderLines(isSelected),
 		pr.renderUpdateAt(),

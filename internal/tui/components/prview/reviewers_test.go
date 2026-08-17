@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/x/ansi"
+	graphql "github.com/cli/shurcooL-graphql"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dlvhdr/gh-dash/v4/internal/config"
@@ -14,6 +15,18 @@ import (
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/context"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/theme"
 )
+
+// reviewAuthor builds a data.Review.Author value with the given login and
+// account type ("User" or "Bot").
+func reviewAuthor(login, typename string) struct {
+	Login    string
+	Typename graphql.String `graphql:"__typename"`
+} {
+	return struct {
+		Login    string
+		Typename graphql.String `graphql:"__typename"`
+	}{Login: login, Typename: graphql.String(typename)}
+}
 
 func newTestModel(
 	t *testing.T,
@@ -97,8 +110,45 @@ func TestRenderRequestedReviewers(t *testing.T) {
 					},
 				},
 			},
-			reviews:      []data.Review{},
-			wantContains: []string{"Reviewers", "@alice", constants.DotIcon},
+			reviews: []data.Review{},
+			wantContains: []string{
+				"Reviewers",
+				"@alice",
+				constants.DotIcon,
+				constants.PersonIcon,
+			},
+			wantNotContain: []string{constants.RobotIcon},
+		},
+		"bot awaiting review": {
+			reviewRequests: []data.ReviewRequestNode{
+				{
+					AsCodeOwner: false,
+					RequestedReviewer: struct {
+						User      data.RequestedReviewerUser      `graphql:"... on User"`
+						Team      data.RequestedReviewerTeam      `graphql:"... on Team"`
+						Bot       data.RequestedReviewerBot       `graphql:"... on Bot"`
+						Mannequin data.RequestedReviewerMannequin `graphql:"... on Mannequin"`
+					}{
+						Bot: data.RequestedReviewerBot{Login: "dependabot"},
+					},
+				},
+			},
+			reviews:        []data.Review{},
+			wantContains:   []string{"Reviewers", "@dependabot", constants.RobotIcon},
+			wantNotContain: []string{constants.PersonIcon},
+		},
+		"bot who approved": {
+			reviewRequests: []data.ReviewRequestNode{},
+			reviews: []data.Review{
+				{Author: reviewAuthor("renovate-bot", "Bot"), State: "APPROVED"},
+			},
+			wantContains: []string{
+				"Reviewers",
+				"@renovate-bot",
+				constants.ApprovedIcon,
+				constants.RobotIcon,
+			},
+			wantNotContain: []string{constants.PersonIcon},
 		},
 		"user who commented": {
 			reviewRequests: []data.ReviewRequestNode{
@@ -115,7 +165,7 @@ func TestRenderRequestedReviewers(t *testing.T) {
 				},
 			},
 			reviews: []data.Review{
-				{Author: struct{ Login string }{Login: "bob"}, State: "COMMENTED"},
+				{Author: reviewAuthor("bob", "User"), State: "COMMENTED"},
 			},
 			wantContains:   []string{"Reviewers", "@bob", constants.CommentIcon},
 			wantNotContain: []string{constants.WaitingIcon},
@@ -203,29 +253,29 @@ func TestRenderRequestedReviewers(t *testing.T) {
 		"reviewer who approved": {
 			reviewRequests: []data.ReviewRequestNode{},
 			reviews: []data.Review{
-				{Author: struct{ Login string }{Login: "alice"}, State: "APPROVED"},
+				{Author: reviewAuthor("alice", "User"), State: "APPROVED"},
 			},
 			wantContains: []string{"Reviewers", "@alice", constants.ApprovedIcon},
 		},
 		"reviewer who requested changes": {
 			reviewRequests: []data.ReviewRequestNode{},
 			reviews: []data.Review{
-				{Author: struct{ Login string }{Login: "bob"}, State: "CHANGES_REQUESTED"},
+				{Author: reviewAuthor("bob", "User"), State: "CHANGES_REQUESTED"},
 			},
 			wantContains: []string{"Reviewers", "@bob", constants.ChangesRequestedIcon},
 		},
 		"reviewer who only commented": {
 			reviewRequests: []data.ReviewRequestNode{},
 			reviews: []data.Review{
-				{Author: struct{ Login string }{Login: "charlie"}, State: "COMMENTED"},
+				{Author: reviewAuthor("charlie", "User"), State: "COMMENTED"},
 			},
 			wantContains: []string{"Reviewers", "@charlie", constants.CommentIcon},
 		},
 		"reviewer who approved then commented": {
 			reviewRequests: []data.ReviewRequestNode{},
 			reviews: []data.Review{
-				{Author: struct{ Login string }{Login: "alice"}, State: "APPROVED"},
-				{Author: struct{ Login string }{Login: "alice"}, State: "COMMENTED"},
+				{Author: reviewAuthor("alice", "User"), State: "APPROVED"},
+				{Author: reviewAuthor("alice", "User"), State: "COMMENTED"},
 			},
 			wantContains:   []string{"Reviewers", "@alice", constants.ApprovedIcon},
 			wantNotContain: []string{constants.CommentIcon},
@@ -233,8 +283,8 @@ func TestRenderRequestedReviewers(t *testing.T) {
 		"reviewer who requested changes then commented": {
 			reviewRequests: []data.ReviewRequestNode{},
 			reviews: []data.Review{
-				{Author: struct{ Login string }{Login: "bob"}, State: "CHANGES_REQUESTED"},
-				{Author: struct{ Login string }{Login: "bob"}, State: "COMMENTED"},
+				{Author: reviewAuthor("bob", "User"), State: "CHANGES_REQUESTED"},
+				{Author: reviewAuthor("bob", "User"), State: "COMMENTED"},
 			},
 			wantContains:   []string{"Reviewers", "@bob", constants.ChangesRequestedIcon},
 			wantNotContain: []string{constants.CommentIcon},
@@ -254,8 +304,8 @@ func TestRenderRequestedReviewers(t *testing.T) {
 				},
 			},
 			reviews: []data.Review{
-				{Author: struct{ Login string }{Login: "bob"}, State: "APPROVED"},
-				{Author: struct{ Login string }{Login: "charlie"}, State: "CHANGES_REQUESTED"},
+				{Author: reviewAuthor("bob", "User"), State: "APPROVED"},
+				{Author: reviewAuthor("charlie", "User"), State: "CHANGES_REQUESTED"},
 			},
 			wantContains: []string{
 				"Reviewers", "@alice", "@bob", "@charlie", constants.DotIcon,
@@ -270,7 +320,7 @@ func TestRenderRequestedReviewers(t *testing.T) {
 				ReviewRequests: data.ReviewRequestsNumber{
 					TotalCount: len(tc.reviewRequests),
 				},
-				Reviews: data.ReviewsNumber{
+				Reviews: data.ReviewsWithAuthorType{
 					TotalCount: len(tc.reviews),
 				},
 			}
@@ -296,6 +346,54 @@ func TestRenderRequestedReviewers(t *testing.T) {
 	}
 }
 
+func TestRenderRequestedReviewersGrouping(t *testing.T) {
+	reviewRequests := []data.ReviewRequestNode{
+		{
+			AsCodeOwner: false,
+			RequestedReviewer: struct {
+				User      data.RequestedReviewerUser      `graphql:"... on User"`
+				Team      data.RequestedReviewerTeam      `graphql:"... on Team"`
+				Bot       data.RequestedReviewerBot       `graphql:"... on Bot"`
+				Mannequin data.RequestedReviewerMannequin `graphql:"... on Mannequin"`
+			}{
+				User: data.RequestedReviewerUser{Login: "alice"},
+			},
+		},
+	}
+	reviews := []data.Review{
+		{Author: reviewAuthor("dependabot", "Bot"), State: "APPROVED"},
+	}
+
+	prData := &data.PullRequestData{
+		ReviewRequests: data.ReviewRequestsNumber{TotalCount: len(reviewRequests)},
+		Reviews:        data.ReviewsWithAuthorType{TotalCount: len(reviews)},
+	}
+
+	m := newTestModel(t, prData, reviews, reviewRequests)
+	got := ansi.Strip(m.renderRequestedReviewers())
+
+	require.Contains(t, got, constants.PersonIcon, "expected human group icon in output: %q", got)
+	require.Contains(t, got, constants.RobotIcon, "expected bot group icon in output: %q", got)
+
+	lines := strings.Split(got, "\n")
+	var humanLine, botLine string
+	for _, line := range lines {
+		if strings.Contains(line, constants.PersonIcon) {
+			humanLine = line
+		}
+		if strings.Contains(line, constants.RobotIcon) {
+			botLine = line
+		}
+	}
+
+	require.NotEmpty(t, humanLine, "expected a line with the human group icon")
+	require.NotEmpty(t, botLine, "expected a line with the bot group icon")
+	require.Contains(t, humanLine, "@alice")
+	require.NotContains(t, humanLine, "@dependabot")
+	require.Contains(t, botLine, "@dependabot")
+	require.NotContains(t, botLine, "@alice")
+}
+
 func TestRenderRequestedReviewersWrapping(t *testing.T) {
 	// Create multiple reviewers that would exceed a narrow width
 	reviewRequests := []data.ReviewRequestNode{}
@@ -317,7 +415,7 @@ func TestRenderRequestedReviewersWrapping(t *testing.T) {
 		ReviewRequests: data.ReviewRequestsNumber{
 			TotalCount: len(reviewRequests),
 		},
-		Reviews: data.ReviewsNumber{
+		Reviews: data.ReviewsWithAuthorType{
 			TotalCount: 0,
 		},
 	}

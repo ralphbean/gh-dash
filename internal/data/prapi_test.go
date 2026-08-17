@@ -132,6 +132,131 @@ func TestReviewThreadWithComments_Fields(t *testing.T) {
 	require.Equal(t, "@@ -1,2 +1,2 @@\n-old\n+new", thread.Comments.Nodes[0].DiffHunk)
 }
 
+func TestComputeReviewStatus(t *testing.T) {
+	tests := []struct {
+		name    string
+		reviews []ReviewSummary
+		want    string
+	}{
+		{
+			name:    "empty input",
+			reviews: nil,
+			want:    "",
+		},
+		{
+			name: "single approval",
+			reviews: []ReviewSummary{
+				{Login: "alice", State: "APPROVED"},
+			},
+			want: "APPROVED",
+		},
+		{
+			name: "single changes requested",
+			reviews: []ReviewSummary{
+				{Login: "alice", State: "CHANGES_REQUESTED"},
+			},
+			want: "CHANGES_REQUESTED",
+		},
+		{
+			name: "single comment",
+			reviews: []ReviewSummary{
+				{Login: "alice", State: "COMMENTED"},
+			},
+			want: "COMMENTED",
+		},
+		{
+			name: "approval then comment stays approved",
+			reviews: []ReviewSummary{
+				{Login: "alice", State: "APPROVED"},
+				{Login: "alice", State: "COMMENTED"},
+			},
+			want: "APPROVED",
+		},
+		{
+			name: "changes requested then comment stays changes requested",
+			reviews: []ReviewSummary{
+				{Login: "alice", State: "CHANGES_REQUESTED"},
+				{Login: "alice", State: "COMMENTED"},
+			},
+			want: "CHANGES_REQUESTED",
+		},
+		{
+			name: "multiple authors with mixed states",
+			reviews: []ReviewSummary{
+				{Login: "alice", State: "APPROVED"},
+				{Login: "bob", State: "CHANGES_REQUESTED"},
+				{Login: "carol", State: "COMMENTED"},
+			},
+			want: "CHANGES_REQUESTED",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, ComputeReviewStatus(tt.reviews))
+		})
+	}
+}
+
+func TestPartitionByBotAuthor(t *testing.T) {
+	tests := []struct {
+		name      string
+		reviews   []ReviewSummary
+		wantHuman []ReviewSummary
+		wantBot   []ReviewSummary
+	}{
+		{
+			name:      "empty",
+			reviews:   nil,
+			wantHuman: nil,
+			wantBot:   nil,
+		},
+		{
+			name: "all human",
+			reviews: []ReviewSummary{
+				{Login: "alice", Typename: "User", State: "APPROVED"},
+				{Login: "bob", Typename: "User", State: "COMMENTED"},
+			},
+			wantHuman: []ReviewSummary{
+				{Login: "alice", Typename: "User", State: "APPROVED"},
+				{Login: "bob", Typename: "User", State: "COMMENTED"},
+			},
+			wantBot: nil,
+		},
+		{
+			name: "all bot",
+			reviews: []ReviewSummary{
+				{Login: "dependabot", Typename: "Bot", State: "APPROVED"},
+			},
+			wantHuman: nil,
+			wantBot: []ReviewSummary{
+				{Login: "dependabot", Typename: "Bot", State: "APPROVED"},
+			},
+		},
+		{
+			name: "mixed",
+			reviews: []ReviewSummary{
+				{Login: "alice", Typename: "User", State: "APPROVED"},
+				{Login: "dependabot", Typename: "Bot", State: "COMMENTED"},
+			},
+			wantHuman: []ReviewSummary{
+				{Login: "alice", Typename: "User", State: "APPROVED"},
+			},
+			wantBot: []ReviewSummary{
+				{Login: "dependabot", Typename: "Bot", State: "COMMENTED"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			human, bot := PartitionByBotAuthor(tt.reviews)
+			require.Equal(t, tt.wantHuman, human)
+			require.Equal(t, tt.wantBot, bot)
+		})
+	}
+}
+
 func TestSetClient(t *testing.T) {
 	// Save original state
 	originalClient := client

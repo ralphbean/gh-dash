@@ -343,6 +343,7 @@ func (m *Model) renderRequestedReviewers() string {
 	}
 
 	reviewStates := make(map[string]string)
+	reviewAuthorIsBot := make(map[string]bool)
 	for _, review := range reviews {
 		login := review.Author.Login
 		existingState := reviewStates[login]
@@ -352,15 +353,16 @@ func (m *Model) renderRequestedReviewers() string {
 			continue
 		}
 		reviewStates[login] = review.State
+		reviewAuthorIsBot[login] = string(review.Author.Typename) == "Bot"
 	}
 
-	reviewerItems := make([]reviewerItem, 0)
 	faintStyle := m.ctx.Styles.Common.FaintTextStyle
 	reviewerStyle := lipgloss.NewStyle().Foreground(m.ctx.Theme.FaintText)
 	successStyle := lipgloss.NewStyle().Foreground(m.ctx.Theme.SuccessText)
 	errorStyle := lipgloss.NewStyle().Foreground(m.ctx.Theme.ErrorText)
 
 	shownReviewers := make(map[string]bool)
+	var humanItems, botItems []reviewerItem
 
 	for _, req := range reviewRequests {
 		displayName := req.GetReviewerDisplayName()
@@ -389,7 +391,12 @@ func (m *Model) renderRequestedReviewers() string {
 		}
 		reviewerStr = lipgloss.JoinHorizontal(lipgloss.Top, stateIcon, " ", reviewerStr)
 
-		reviewerItems = append(reviewerItems, reviewerItem{text: reviewerStr})
+		item := reviewerItem{text: reviewerStr}
+		if req.GetReviewerType() == "Bot" {
+			botItems = append(botItems, item)
+		} else {
+			humanItems = append(humanItems, item)
+		}
 	}
 
 	for login, state := range reviewStates {
@@ -412,10 +419,16 @@ func (m *Model) renderRequestedReviewers() string {
 		}
 		reviewerStr := stateIcon + " " + reviewerStyle.Render("@"+login)
 
-		reviewerItems = append(reviewerItems, reviewerItem{text: reviewerStr})
+		item := reviewerItem{text: reviewerStr}
+		if reviewAuthorIsBot[login] {
+			botItems = append(botItems, item)
+		} else {
+			humanItems = append(humanItems, item)
+		}
 	}
 
-	// Show suggested reviewers (= code owners) who haven't been requested or reviewed yet
+	// Show suggested reviewers (= code owners) who haven't been requested or reviewed yet.
+	// Suggested reviewers always bucket as human (see design.md).
 	for _, suggested := range suggestedReviewers {
 		login := suggested.Reviewer.Login
 		if shownReviewers[login] {
@@ -431,25 +444,59 @@ func (m *Model) renderRequestedReviewers() string {
 			faintStyle.Render("@"+login),
 		)
 
-		reviewerItems = append(reviewerItems, reviewerItem{text: reviewerStr})
+		humanItems = append(humanItems, reviewerItem{text: reviewerStr})
 	}
 
-	if len(reviewerItems) == 0 {
+	if len(humanItems) == 0 && len(botItems) == 0 {
 		return ""
 	}
 
-	width := m.getIndentedContentWidth()
+	var groups []string
+	if len(humanItems) > 0 {
+		groups = append(groups, m.renderReviewerGroup(constants.PersonIcon, humanItems))
+	}
+	if len(botItems) > 0 {
+		groups = append(groups, m.renderReviewerGroup(constants.RobotIcon, botItems))
+	}
+
+	return lipgloss.JoinVertical(
+		lipgloss.Left,
+		m.ctx.Styles.Common.MainTextStyle.Underline(true).Bold(true).Render(
+			fmt.Sprintf("%s Reviewers", constants.CodeReviewIcon)),
+		"",
+		lipgloss.JoinVertical(lipgloss.Left, groups...),
+	)
+}
+
+// renderReviewerGroup wraps a single group's (human or bot) reviewer items
+// to the available width, prefixing every resulting row with the group's
+// icon so the group remains identifiable even when it wraps onto multiple
+// lines.
+func (m *Model) renderReviewerGroup(icon string, items []reviewerItem) string {
+	prefix := icon + " "
+	rows := m.wrapReviewerItems(items, lipgloss.Width(prefix))
+	for i, row := range rows {
+		rows[i] = prefix + row
+	}
+	return strings.Join(rows, "\n")
+}
+
+// wrapReviewerItems lays out reviewer items left-to-right, comma-separated,
+// wrapping onto additional rows once a row would exceed the available
+// width (reduced by prefixWidth to leave room for a group icon prefix).
+func (m *Model) wrapReviewerItems(items []reviewerItem, prefixWidth int) []string {
+	width := m.getIndentedContentWidth() - prefixWidth
 	var rows []string
 	var currentRow strings.Builder
 	currentRowWidth := 0
 
-	for i, item := range reviewerItems {
+	for i, item := range items {
 		itemWidth := lipgloss.Width(item.text)
 		separator := ", "
 		separatorWidth := lipgloss.Width(separator)
 
 		// Check if adding this item would exceed the width
-		needsSeparator := i < len(reviewerItems)-1
+		needsSeparator := i < len(items)-1
 		totalItemWidth := itemWidth
 		if needsSeparator {
 			totalItemWidth += separatorWidth
@@ -476,13 +523,7 @@ func (m *Model) renderRequestedReviewers() string {
 		rows = append(rows, currentRow.String())
 	}
 
-	return lipgloss.JoinVertical(
-		lipgloss.Left,
-		m.ctx.Styles.Common.MainTextStyle.Underline(true).Bold(true).Render(
-			fmt.Sprintf("%s Reviewers", constants.CodeReviewIcon)),
-		"",
-		strings.Join(rows, "\n"),
-	)
+	return rows
 }
 
 func (m *Model) renderAuthor() string {

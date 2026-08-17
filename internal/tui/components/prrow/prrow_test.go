@@ -180,6 +180,159 @@ func TestRenderStar(t *testing.T) {
 	}
 }
 
+func reviewNodes(reviews ...struct {
+	Login    string
+	Typename string
+	State    string
+}) []struct {
+	State  string
+	Author struct {
+		Login    string
+		Typename graphql.String `graphql:"__typename"`
+	}
+} {
+	nodes := make([]struct {
+		State  string
+		Author struct {
+			Login    string
+			Typename graphql.String `graphql:"__typename"`
+		}
+	}, len(reviews))
+	for i, r := range reviews {
+		nodes[i].State = r.State
+		nodes[i].Author.Login = r.Login
+		nodes[i].Author.Typename = graphql.String(r.Typename)
+	}
+	return nodes
+}
+
+func TestRenderReviewStatusHumanAndBot(t *testing.T) {
+	type reviewInput = struct {
+		Login    string
+		Typename string
+		State    string
+	}
+
+	tests := []struct {
+		name          string
+		pr            *PullRequest
+		wantHuman     string
+		wantBot       string
+		wantHumanIcon string
+		wantBotIcon   string
+	}{
+		{
+			name:      "nil Primary renders dash for both",
+			pr:        &PullRequest{Data: &Data{Primary: nil}},
+			wantHuman: "-",
+			wantBot:   "-",
+		},
+		{
+			name: "no reviews renders waiting for both",
+			pr: &PullRequest{
+				Data: &Data{Primary: &data.PullRequestData{}},
+			},
+			wantHumanIcon: "waiting",
+			wantBotIcon:   "waiting",
+		},
+		{
+			name: "human-only reviews",
+			pr: &PullRequest{
+				Data: &Data{
+					Primary: &data.PullRequestData{
+						Reviews: data.ReviewsWithAuthorType{
+							Nodes: reviewNodes(
+								reviewInput{Login: "alice", Typename: "User", State: "APPROVED"},
+							),
+						},
+					},
+				},
+			},
+			wantHumanIcon: "approved",
+			wantBotIcon:   "waiting",
+		},
+		{
+			name: "bot-only reviews",
+			pr: &PullRequest{
+				Data: &Data{
+					Primary: &data.PullRequestData{
+						Reviews: data.ReviewsWithAuthorType{
+							Nodes: reviewNodes(
+								reviewInput{
+									Login:    "dependabot",
+									Typename: "Bot",
+									State:    "CHANGES_REQUESTED",
+								},
+							),
+						},
+					},
+				},
+			},
+			wantHumanIcon: "waiting",
+			wantBotIcon:   "changesRequested",
+		},
+		{
+			name: "mixed human and bot reviews",
+			pr: &PullRequest{
+				Data: &Data{
+					Primary: &data.PullRequestData{
+						Reviews: data.ReviewsWithAuthorType{
+							Nodes: reviewNodes(
+								reviewInput{Login: "alice", Typename: "User", State: "COMMENTED"},
+								reviewInput{
+									Login:    "dependabot",
+									Typename: "Bot",
+									State:    "APPROVED",
+								},
+							),
+						},
+					},
+				},
+			},
+			wantHumanIcon: "commented",
+			wantBotIcon:   "approved",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.pr.Ctx = newTestContext(t)
+
+			human := tt.pr.renderReviewStatusHuman()
+			bot := tt.pr.renderReviewStatusBot()
+
+			if tt.wantHuman != "" {
+				require.Equal(t, tt.wantHuman, human)
+			}
+			if tt.wantBot != "" {
+				require.Equal(t, tt.wantBot, bot)
+			}
+
+			switch tt.wantHumanIcon {
+			case "approved":
+				require.Contains(t, human, constants.ApprovedIcon)
+			case "changesRequested":
+				require.Contains(t, human, constants.ChangesRequestedIcon)
+			case "commented":
+				require.Contains(t, human, tt.pr.Ctx.Styles.Common.CommentGlyph)
+			case "waiting":
+				require.Contains(t, human, tt.pr.Ctx.Styles.Common.WaitingGlyph)
+			}
+
+			switch tt.wantBotIcon {
+			case "approved":
+				require.Contains(t, bot, constants.ApprovedIcon)
+			case "changesRequested":
+				require.Contains(t, bot, constants.ChangesRequestedIcon)
+			case "commented":
+				require.Contains(t, bot, tt.pr.Ctx.Styles.Common.CommentGlyph)
+			case "waiting":
+				require.Contains(t, bot, tt.pr.Ctx.Styles.Common.WaitingGlyph)
+			}
+		})
+	}
+}
+
 func TestGetStatusChecksRollup(t *testing.T) {
 	tests := []struct {
 		name     string

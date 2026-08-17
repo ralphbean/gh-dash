@@ -90,7 +90,7 @@ type PullRequestData struct {
 	Repository       Repository
 	Assignees        Assignees                   `graphql:"assignees(first: 3)"`
 	ReviewThreads    ReviewThreadsWithResolution `graphql:"reviewThreads(last: 100)"`
-	Reviews          ReviewsNumber               `graphql:"reviews"`
+	Reviews          ReviewsWithAuthorType       `graphql:"reviews(last: 100)"`
 	ReviewRequests   ReviewRequestsNumber        `graphql:"reviewRequests"`
 	IsDraft          bool
 	IsInMergeQueue   bool
@@ -277,7 +277,8 @@ type ReviewThreadsWithResolution struct {
 
 type Review struct {
 	Author struct {
-		Login string
+		Login    string
+		Typename graphql.String `graphql:"__typename"`
 	}
 	Body      string
 	State     string
@@ -291,6 +292,115 @@ type ReviewsNumber struct {
 type Reviews struct {
 	TotalCount int
 	Nodes      []Review
+}
+
+// ReviewsWithAuthorType is a lighter-weight alternative to Reviews for
+// contexts (like the PRs list query) that only need each review's state and
+// author account type - not the review body or timestamp.
+type ReviewsWithAuthorType struct {
+	TotalCount int
+	Nodes      []struct {
+		State  string
+		Author struct {
+			Login    string
+			Typename graphql.String `graphql:"__typename"`
+		}
+	}
+}
+
+// ReviewSummary is a minimal, source-agnostic view of a single review used
+// to compute review status independently of which query fetched it.
+type ReviewSummary struct {
+	Login    string
+	Typename string
+	State    string
+}
+
+func (r Review) ToReviewSummary() ReviewSummary {
+	return ReviewSummary{
+		Login:    r.Author.Login,
+		Typename: string(r.Author.Typename),
+		State:    r.State,
+	}
+}
+
+func ReviewSummariesFromReviews(reviews []Review) []ReviewSummary {
+	summaries := make([]ReviewSummary, 0, len(reviews))
+	for _, review := range reviews {
+		summaries = append(summaries, review.ToReviewSummary())
+	}
+	return summaries
+}
+
+func ReviewSummariesFromReviewsWithAuthorType(reviews ReviewsWithAuthorType) []ReviewSummary {
+	summaries := make([]ReviewSummary, 0, len(reviews.Nodes))
+	for _, node := range reviews.Nodes {
+		summaries = append(summaries, ReviewSummary{
+			Login:    node.Author.Login,
+			Typename: string(node.Author.Typename),
+			State:    node.State,
+		})
+	}
+	return summaries
+}
+
+// PartitionByBotAuthor splits reviews into two slices: those authored by a
+// bot (GitHub App) account, and everything else (human users, teams,
+// mannequins, etc.).
+func PartitionByBotAuthor(reviews []ReviewSummary) (human, bot []ReviewSummary) {
+	for _, review := range reviews {
+		if review.Typename == "Bot" {
+			bot = append(bot, review)
+		} else {
+			human = append(human, review)
+		}
+	}
+	return human, bot
+}
+
+// ComputeReviewStatus determines the aggregate review status for a set of
+// reviews: the most decisive state per author (approved/changes-requested
+// take priority over a later comment from the same author) is combined
+// across authors, with changes-requested beating approved beating commented.
+// Returns "APPROVED", "CHANGES_REQUESTED", "COMMENTED", or "" (no actionable
+// reviews).
+func ComputeReviewStatus(reviews []ReviewSummary) string {
+	perAuthor := make(map[string]string)
+	for _, review := range reviews {
+		if review.State != "APPROVED" &&
+			review.State != "CHANGES_REQUESTED" &&
+			review.State != "COMMENTED" {
+			continue
+		}
+		existing := perAuthor[review.Login]
+		// Don't let a later COMMENTED review from the same author downgrade
+		// an earlier APPROVED or CHANGES_REQUESTED.
+		if review.State == "COMMENTED" &&
+			(existing == "APPROVED" || existing == "CHANGES_REQUESTED") {
+			continue
+		}
+		perAuthor[review.Login] = review.State
+	}
+
+	sawApproved := false
+	sawCommented := false
+	for _, state := range perAuthor {
+		switch state {
+		case "CHANGES_REQUESTED":
+			return "CHANGES_REQUESTED"
+		case "APPROVED":
+			sawApproved = true
+		case "COMMENTED":
+			sawCommented = true
+		}
+	}
+	if sawApproved {
+		return "APPROVED"
+	}
+	if sawCommented {
+		return "COMMENTED"
+	}
+	return ""
 }
 
 type ReviewThreadWithComments struct {
