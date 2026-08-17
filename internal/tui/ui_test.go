@@ -2642,6 +2642,47 @@ func TestExitDetailsView_RestoresPriorPreviewState(t *testing.T) {
 	}
 }
 
+func TestExitDetailsView_RestoresDimensions(t *testing.T) {
+	zone.NewGlobal()
+	m := newDetailsViewTestModel(t, 3, false)
+	// Fully initialize the model so sections have correct dimensions.
+	m.syncProgramContext()
+
+	// Capture dimensions before entering details view.
+	widthBefore := m.ctx.MainContentWidth
+	heightBefore := m.ctx.MainContentHeight
+	viewBefore := m.View()
+	linesBefore := strings.Count(viewBefore.Content, "\n")
+
+	// Enter details view.
+	newModel, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = newModel.(Model)
+	require.True(t, m.detailsViewState.active)
+
+	// Exit details view.
+	newModel, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
+	m = newModel.(Model)
+	require.False(t, m.detailsViewState.active)
+
+	// Dimensions should match what they were before entering.
+	require.Equal(t, widthBefore, m.ctx.MainContentWidth,
+		"MainContentWidth should be restored after exiting details view")
+	require.Equal(t, heightBefore, m.ctx.MainContentHeight,
+		"MainContentHeight should be restored after exiting details view")
+
+	// The rendered view should have the same number of lines.
+	viewAfter := m.View()
+	linesAfter := strings.Count(viewAfter.Content, "\n")
+	require.Equal(t, linesBefore, linesAfter,
+		"View should have the same number of lines after exiting details view")
+
+	// Section row content should not be truncated by the details-view
+	// round-trip. The extended title includes "by @" — if the rows were
+	// rebuilt at zero width, that text gets truncated.
+	require.Contains(t, viewAfter.Content, "by",
+		"row content should preserve author info after exiting details view")
+}
+
 func TestNotificationView_FirstEnterLoadsContentWithoutEnteringDetailsView(t *testing.T) {
 	cfg, err := config.ParseConfig(config.Location{
 		ConfigFlag:       "../config/testdata/test-config.yml",

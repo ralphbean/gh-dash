@@ -1211,8 +1211,14 @@ func (m *Model) onWindowSizeChanged(msg tea.WindowSizeMsg) {
 }
 
 func (m *Model) syncProgramContext() {
-	for _, section := range m.getCurrentViewSections() {
-		section.UpdateProgramContext(m.ctx)
+	// Skip section updates while the details view is active.
+	// MainContentWidth is 0 in that mode, and propagating it would cause
+	// sections to rebuild row strings at zero width. Those truncated
+	// strings survive into the list view when the details view is closed.
+	if !m.detailsViewState.active {
+		for _, section := range m.getCurrentViewSections() {
+			section.UpdateProgramContext(m.ctx)
+		}
 	}
 	m.tabs.UpdateProgramContext(m.ctx)
 	m.footer.UpdateProgramContext(m.ctx)
