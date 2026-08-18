@@ -8,11 +8,21 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	cliBrowser "github.com/cli/browser"
 	"github.com/cli/go-gh/v2/pkg/browser"
 
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/constants"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/context"
 )
+
+func init() {
+	// When no custom launcher is configured, go-gh's browser.Browse falls
+	// through to cli/browser.OpenURL which uses these package-level writers
+	// (defaulting to os.Stdout / os.Stderr). Silence them so xdg-open noise
+	// doesn't corrupt the TUI. See #829, #584, #679.
+	cliBrowser.Stdout = io.Discard
+	cliBrowser.Stderr = io.Discard
+}
 
 func (m *Model) openBrowser() tea.Cmd {
 	taskId := fmt.Sprintf("open_browser_%d", time.Now().Unix())
