@@ -239,7 +239,10 @@ func TestNotificationView_SwitchViewWithSKey_WhileViewingPR(t *testing.T) {
 	m.prs = []section.Section{&prSec}
 
 	// Set up a PR notification subject (simulating viewing a PR notification)
-	m.notificationView.SetSubjectPR(&prrow.Data{}, "test-notification-id")
+	m.notificationView.SetSubjectPR(
+		&prrow.Data{
+			Primary: &data.PullRequestData{Title: "Test PR", State: "OPEN"},
+		}, "test-notification-id")
 
 	// Verify we start in NotificationsView
 	require.Equal(t, config.NotificationsView, m.ctx.View, "should start in NotificationsView")
@@ -334,7 +337,10 @@ func TestNotificationView_PRViewTabNavigation(t *testing.T) {
 	}
 
 	// Set up a PR notification subject so GetSubjectPR() returns non-nil
-	m.notificationView.SetSubjectPR(&prrow.Data{}, "test-notification-id")
+	m.notificationView.SetSubjectPR(
+		&prrow.Data{
+			Primary: &data.PullRequestData{Title: "Test PR", State: "OPEN"},
+		}, "test-notification-id")
 
 	// Get initial tab
 	initialTab := m.prView.SelectedTab()
@@ -415,7 +421,9 @@ func TestNotificationView_EnterKeyEntersDetailsViewAfterViewingPR(t *testing.T) 
 	m.notifications = []section.Section{&notifSec}
 
 	// Set up a PR notification subject (simulating that Enter was already pressed once)
-	m.notificationView.SetSubjectPR(&prrow.Data{}, "test-notification-1")
+	m.notificationView.SetSubjectPR(&prrow.Data{
+		Primary: &data.PullRequestData{Title: "Test PR", State: "OPEN"},
+	}, "test-notification-1")
 
 	// Verify GetSubjectPR returns non-nil
 	require.NotNil(t, m.notificationView.GetSubjectPR(), "subject PR should be set")
@@ -557,7 +565,10 @@ func TestNotificationView_BackKeyClearsPRSubjectAndRestoresNotificationActions(t
 	notifSec.Table.SetRows(notifSec.BuildRows())
 	m.notifications = []section.Section{&notifSec}
 
-	m.notificationView.SetSubjectPR(&prrow.Data{}, "test-notification-pr")
+	m.notificationView.SetSubjectPR(
+		&prrow.Data{
+			Primary: &data.PullRequestData{Title: "Test PR", State: "OPEN"},
+		}, "test-notification-pr")
 	keys.SetNotificationSubject(keys.NotificationSubjectPR)
 
 	newModel, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEsc})
@@ -2331,6 +2342,20 @@ func TestEnterKey_EntersDetailsViewForSelectedRow(t *testing.T) {
 	require.True(t, m.sidebar.IsOpen, "the sidebar/preview should be forced open in details view")
 }
 
+func TestEnterKey_PopulatesSidebarWhenPreviewWasClosed(t *testing.T) {
+	m := newDetailsViewTestModel(t, 1, false)
+	require.False(t, m.sidebar.IsOpen, "preview starts closed")
+
+	newModel, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = newModel.(Model)
+
+	require.True(t, m.detailsViewState.active)
+	require.NotContains(
+		t, m.sidebar.View(), "Nothing selected",
+		"details view should show PR content, not the empty state, when preview was closed",
+	)
+}
+
 func TestEnterKey_NoOpWithNoRowsInSection(t *testing.T) {
 	m := newDetailsViewTestModel(t, 0, false)
 
@@ -2800,7 +2825,10 @@ func TestNotificationView_EscAfterDetailsViewKeepsContentShown(t *testing.T) {
 	m.notifications = []section.Section{&notifSec}
 
 	// Simulate that Enter was already pressed once and content loaded.
-	m.notificationView.SetSubjectPR(&prrow.Data{}, "test-notification-1")
+	m.notificationView.SetSubjectPR(
+		&prrow.Data{
+			Primary: &data.PullRequestData{Title: "Test PR", State: "OPEN"},
+		}, "test-notification-1")
 
 	newModel, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	m = newModel.(Model)

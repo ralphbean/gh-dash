@@ -469,7 +469,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// subject has already been loaded into the preview.
 		case key.Matches(msg, m.keys.Enter) && !m.detailsViewState.active &&
 			currSection != nil && currRowData != nil && m.readyForDetailsView():
-			m.enterDetailsView()
+			cmds = append(cmds, m.enterDetailsView())
 
 		case m.ctx.View == config.RepoView:
 			switch {
@@ -1394,14 +1394,22 @@ func (m *Model) readyForDetailsView() bool {
 	return true
 }
 
-func (m *Model) enterDetailsView() {
+func (m *Model) enterDetailsView() tea.Cmd {
+	wasOpen := m.sidebar.IsOpen
 	m.detailsViewState = detailsViewState{
 		active:       true,
-		prevOpen:     m.sidebar.IsOpen,
+		prevOpen:     wasOpen,
 		prevPosition: m.positionOverride,
 	}
 	m.sidebar.IsOpen = true
 	m.syncMainContentDimensions()
+	// When the preview was already open the sidebar content is up-to-date
+	// from prior navigation. When it was closed, syncSidebar was a no-op
+	// (it early-returns when !IsOpen), so we need to populate it now.
+	if !wasOpen {
+		return m.syncSidebar()
+	}
+	return nil
 }
 
 func (m *Model) exitDetailsView() {
