@@ -159,6 +159,21 @@ func (m *Model) StartThreadReply() tea.Cmd {
 	})
 }
 
+// AppendThreadReply appends a comment to the triage queue's copy of the given
+// thread so the view reflects replies the user just posted.
+func (m *Model) AppendThreadReply(threadId string, comment data.ReviewComment) {
+	if !m.threadTriage.active {
+		return
+	}
+	for i, thread := range m.threadTriage.threads {
+		if thread.Id == threadId {
+			m.threadTriage.threads[i].Comments.Nodes = append(
+				thread.Comments.Nodes, comment)
+			return
+		}
+	}
+}
+
 // ExitThreadTriage restores the carousel to the tab that was selected before
 // triage started and clears the triage state.
 func (m *Model) ExitThreadTriage() {

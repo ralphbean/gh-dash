@@ -286,6 +286,40 @@ func TestViewThreadTriage_OutdatedIndicator(t *testing.T) {
 	require.Contains(t, view, "OUTDATED")
 }
 
+func TestAppendThreadReply_AppendsToMatchingTriageThread(t *testing.T) {
+	m := newTestModelForTriage(t)
+	withTriageThreads(&m, []data.ReviewThreadWithComments{
+		{Id: "t1", Comments: data.ReviewComments{Nodes: []data.ReviewComment{{Body: "original"}}}},
+		{Id: "t2"},
+	})
+
+	reply := data.ReviewComment{Body: "sounds good", Author: struct{ Login string }{Login: "me"}}
+	m.AppendThreadReply("t1", reply)
+
+	require.Len(t, m.threadTriage.threads[0].Comments.Nodes, 2)
+	require.Equal(t, "sounds good", m.threadTriage.threads[0].Comments.Nodes[1].Body)
+	require.Empty(t, m.threadTriage.threads[1].Comments.Nodes, "unrelated thread should be unchanged")
+}
+
+func TestAppendThreadReply_NoOpWhenNotTriaging(t *testing.T) {
+	m := newTestModelForTriage(t)
+
+	reply := data.ReviewComment{Body: "sounds good"}
+	m.AppendThreadReply("t1", reply) // should not panic
+}
+
+func TestAppendThreadReply_NoOpWhenThreadNotInQueue(t *testing.T) {
+	m := newTestModelForTriage(t)
+	withTriageThreads(&m, []data.ReviewThreadWithComments{
+		{Id: "t1"},
+	})
+
+	reply := data.ReviewComment{Body: "sounds good"}
+	m.AppendThreadReply("nonexistent", reply)
+
+	require.Empty(t, m.threadTriage.threads[0].Comments.Nodes)
+}
+
 func TestViewThreadTriage_NoOutdatedIndicatorWhenNotOutdated(t *testing.T) {
 	m := newTestModelForTriage(t)
 	withTriageThreads(&m, []data.ReviewThreadWithComments{

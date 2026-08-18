@@ -854,6 +854,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			scmd := m.updateSection(msg.SectionId, msg.SectionType, msg.Msg)
 			cmds = append(cmds, scmd)
 
+			if updateMsg, ok := msg.Msg.(tasks.UpdatePRMsg); ok && updateMsg.NewThreadReply != nil {
+				m.prView.AppendThreadReply(
+					updateMsg.NewThreadReply.ThreadId,
+					updateMsg.NewThreadReply.Comment,
+				)
+			}
+
 			syncCmd := m.syncSidebar()
 			cmds = append(cmds, syncCmd)
 		}
