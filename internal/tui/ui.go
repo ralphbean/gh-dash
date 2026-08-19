@@ -1405,9 +1405,12 @@ func (m *Model) enterDetailsView() tea.Cmd {
 	m.syncMainContentDimensions()
 	// When the preview was already open the sidebar content is up-to-date
 	// from prior navigation. When it was closed, syncSidebar was a no-op
-	// (it early-returns when !IsOpen), so we need to populate it now.
+	// (it early-returns when !IsOpen), so we need to populate it now and
+	// trigger enrichment to fetch full PR data (reviewers, etc.).
 	if !wasOpen {
-		return m.syncSidebar()
+		sidebarCmd := m.syncSidebar()
+		enrichCmd := m.prView.EnrichCurrRow()
+		return tea.Batch(sidebarCmd, enrichCmd)
 	}
 	return nil
 }
