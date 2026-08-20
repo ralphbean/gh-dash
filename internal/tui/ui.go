@@ -284,6 +284,29 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.sidebar.ScrollToBottom()
 				return m, nil
 
+			case m.prView.IsTriagingThreads() && key.Matches(msg, keys.PRKeys.Diff):
+				return m, m.prView.OpenDiffInTriage()
+
+			case m.prView.IsTriagingThreads() && key.Matches(msg, m.keys.OpenGithub):
+				url := m.prView.GetTriagePRUrl()
+				if url != "" {
+					taskId := fmt.Sprintf("open_browser_%d", time.Now().Unix())
+					task := context.Task{
+						Id:           taskId,
+						StartText:    "Opening in browser",
+						FinishedText: "Opened in browser",
+						State:        context.TaskStart,
+					}
+					startCmd := m.ctx.StartTask(task)
+					openCmd := func() tea.Msg {
+						b := browser.New("", io.Discard, io.Discard)
+						err := b.Browse(url)
+						return constants.TaskFinishedMsg{TaskId: taskId, Err: err}
+					}
+					return m, tea.Batch(startCmd, openCmd)
+				}
+				return m, nil
+
 			case m.prView.IsTriagingThreads() && key.Matches(msg, m.keys.Help):
 				m.footer.ShowAll = !m.footer.ShowAll
 				m.syncMainContentDimensions()

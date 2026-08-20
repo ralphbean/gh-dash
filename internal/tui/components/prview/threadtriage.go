@@ -9,6 +9,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/dlvhdr/gh-dash/v4/internal/data"
+	"github.com/dlvhdr/gh-dash/v4/internal/tui/common"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/cmpcontroller"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/fuzzyselect"
 	"github.com/dlvhdr/gh-dash/v4/internal/tui/components/prssection"
@@ -185,6 +186,26 @@ func (m *Model) ExitThreadTriage() {
 			break
 		}
 	}
+}
+
+// OpenDiffInTriage opens the diff viewer for the PR being triaged.
+func (m *Model) OpenDiffInTriage() tea.Cmd {
+	if !m.threadTriage.active || m.pr == nil {
+		return nil
+	}
+	return common.DiffPR(
+		m.pr.Data.Primary.GetNumber(),
+		m.pr.Data.Primary.GetRepoNameWithOwner(),
+		m.ctx.Config.GetFullScreenDiffPagerEnv(),
+	)
+}
+
+// GetTriagePRUrl returns the URL of the PR being triaged, or empty string if not triaging.
+func (m *Model) GetTriagePRUrl() string {
+	if !m.threadTriage.active || m.pr == nil {
+		return ""
+	}
+	return m.pr.Data.Primary.Url
 }
 
 func (m *Model) viewThreadTriage() string {
