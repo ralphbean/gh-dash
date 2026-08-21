@@ -5,6 +5,7 @@ import (
 	"image/color"
 	"regexp"
 	"strings"
+	"time"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
@@ -177,6 +178,8 @@ func (m *Model) viewHeader() string {
 	header.WriteString(m.renderBranches())
 	header.WriteString("\n\n")
 	header.WriteString(m.renderAuthor())
+	header.WriteString("\n")
+	header.WriteString(m.renderLastUpdate())
 	header.WriteString("\n\n")
 	header.WriteString(lipgloss.NewStyle().Width(m.width).
 		Border(lipgloss.NormalBorder(), false, false, true, false).
@@ -531,18 +534,83 @@ func (m *Model) renderAuthor() string {
 	if authorAssociation == "" {
 		authorAssociation = "unknown role"
 	}
-	time := lipgloss.NewStyle().Render(utils.TimeElapsed(m.pr.Data.Primary.CreatedAt))
+	timeElapsed := lipgloss.NewStyle().Render(utils.TimeElapsed(m.pr.Data.Primary.CreatedAt))
 	return lipgloss.JoinHorizontal(lipgloss.Top,
 		" by ",
 		lipgloss.NewStyle().Foreground(m.ctx.Theme.PrimaryText).Render(
 			lipgloss.NewStyle().Bold(true).Render("@"+m.pr.Data.Primary.Author.Login)),
 		lipgloss.NewStyle().Foreground(m.ctx.Theme.FaintText).Render(
-			lipgloss.JoinHorizontal(lipgloss.Top, " ⋅ ", time, " ago", " ⋅ ")),
+			lipgloss.JoinHorizontal(lipgloss.Top, " ⋅ ", timeElapsed, " ago", " ⋅ ")),
 		lipgloss.NewStyle().Foreground(m.ctx.Theme.FaintText).Render(
 			lipgloss.JoinHorizontal(lipgloss.Top, data.GetAuthorRoleIcon(m.pr.Data.Primary.AuthorAssociation,
 				m.ctx.Theme),
 				" ", lipgloss.NewStyle().Foreground(m.ctx.Theme.FaintText).Render(strings.ToLower(authorAssociation))),
 		),
+	)
+}
+
+func (m *Model) getLastUpdater() (login string, updatedAt time.Time) {
+	if !m.pr.Data.IsEnriched {
+		// Fall back to UpdatedAt from primary data
+		return "", m.pr.Data.Primary.UpdatedAt
+	}
+
+	var latestTime time.Time
+	var latestLogin string
+
+	// Check comments
+	for _, c := range m.pr.Data.Enriched.Comments.Nodes {
+		if c.UpdatedAt.After(latestTime) {
+			latestTime = c.UpdatedAt
+			latestLogin = c.Author.Login
+		}
+	}
+
+	// Check review threads
+	for _, thread := range m.pr.Data.Enriched.ReviewThreads.Nodes {
+		for _, c := range thread.Comments.Nodes {
+			if c.UpdatedAt.After(latestTime) {
+				latestTime = c.UpdatedAt
+				latestLogin = c.Author.Login
+			}
+		}
+	}
+
+	// Check reviews
+	for _, review := range m.pr.Data.Enriched.Reviews.Nodes {
+		if review.UpdatedAt.After(latestTime) {
+			latestTime = review.UpdatedAt
+			latestLogin = review.Author.Login
+		}
+	}
+
+	// If no activity found, use the PR's UpdatedAt
+	if latestLogin == "" {
+		return "", m.pr.Data.Primary.UpdatedAt
+	}
+
+	return latestLogin, latestTime
+}
+
+func (m *Model) renderLastUpdate() string {
+	login, updatedAt := m.getLastUpdater()
+	timeElapsed := lipgloss.NewStyle().Render(utils.TimeElapsed(updatedAt))
+
+	if login == "" {
+		// No specific updater found, just show the time
+		return lipgloss.JoinHorizontal(lipgloss.Top,
+			" updated ",
+			lipgloss.NewStyle().Foreground(m.ctx.Theme.FaintText).Render(
+				lipgloss.JoinHorizontal(lipgloss.Top, timeElapsed, " ago")),
+		)
+	}
+
+	return lipgloss.JoinHorizontal(lipgloss.Top,
+		" updated by ",
+		lipgloss.NewStyle().Foreground(m.ctx.Theme.PrimaryText).Render(
+			lipgloss.NewStyle().Bold(true).Render("@"+login)),
+		lipgloss.NewStyle().Foreground(m.ctx.Theme.FaintText).Render(
+			lipgloss.JoinHorizontal(lipgloss.Top, " ⋅ ", timeElapsed, " ago")),
 	)
 }
 

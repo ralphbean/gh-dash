@@ -5,6 +5,7 @@ import (
 	"image/color"
 	"regexp"
 	"strings"
+	"time"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
@@ -134,6 +135,8 @@ func (m Model) View() string {
 	s.WriteString(m.renderStatusPill())
 	s.WriteString("\n\n")
 	s.WriteString(m.renderAuthor())
+	s.WriteString("\n")
+	s.WriteString(m.renderLastUpdate())
 	s.WriteString("\n\n")
 
 	labels := m.renderLabels()
@@ -197,18 +200,60 @@ func (m *Model) renderAuthor() string {
 	if authorAssociation == "" {
 		authorAssociation = "unknown role"
 	}
-	time := lipgloss.NewStyle().Render(utils.TimeElapsed(m.issue.Data.CreatedAt))
+	timeElapsed := lipgloss.NewStyle().Render(utils.TimeElapsed(m.issue.Data.CreatedAt))
 	return lipgloss.JoinHorizontal(lipgloss.Top,
 		" by ",
 		lipgloss.NewStyle().Foreground(m.ctx.Theme.PrimaryText).Render(
 			lipgloss.NewStyle().Bold(true).Render("@"+m.issue.Data.Author.Login)),
 		lipgloss.NewStyle().Foreground(m.ctx.Theme.FaintText).Render(
-			lipgloss.JoinHorizontal(lipgloss.Top, " ⋅ ", time, " ago", " ⋅ ")),
+			lipgloss.JoinHorizontal(lipgloss.Top, " ⋅ ", timeElapsed, " ago", " ⋅ ")),
 		lipgloss.NewStyle().Foreground(m.ctx.Theme.FaintText).Render(
 			lipgloss.JoinHorizontal(lipgloss.Top, data.GetAuthorRoleIcon(m.issue.Data.AuthorAssociation,
 				m.ctx.Theme),
 				" ", lipgloss.NewStyle().Foreground(m.ctx.Theme.FaintText).Render(strings.ToLower(authorAssociation))),
 		),
+	)
+}
+
+func (m *Model) getLastUpdater() (login string, updatedAt time.Time) {
+	var latestTime time.Time
+	var latestLogin string
+
+	// Check comments to find the most recent updater
+	for _, c := range m.issue.Data.Comments.Nodes {
+		if c.UpdatedAt.After(latestTime) {
+			latestTime = c.UpdatedAt
+			latestLogin = c.Author.Login
+		}
+	}
+
+	// If no comments found, use the issue's UpdatedAt
+	if latestLogin == "" {
+		return "", m.issue.Data.UpdatedAt
+	}
+
+	return latestLogin, latestTime
+}
+
+func (m *Model) renderLastUpdate() string {
+	login, updatedAt := m.getLastUpdater()
+	timeElapsed := lipgloss.NewStyle().Render(utils.TimeElapsed(updatedAt))
+
+	if login == "" {
+		// No specific updater found, just show the time
+		return lipgloss.JoinHorizontal(lipgloss.Top,
+			" updated ",
+			lipgloss.NewStyle().Foreground(m.ctx.Theme.FaintText).Render(
+				lipgloss.JoinHorizontal(lipgloss.Top, timeElapsed, " ago")),
+		)
+	}
+
+	return lipgloss.JoinHorizontal(lipgloss.Top,
+		" updated by ",
+		lipgloss.NewStyle().Foreground(m.ctx.Theme.PrimaryText).Render(
+			lipgloss.NewStyle().Bold(true).Render("@"+login)),
+		lipgloss.NewStyle().Foreground(m.ctx.Theme.FaintText).Render(
+			lipgloss.JoinHorizontal(lipgloss.Top, " ⋅ ", timeElapsed, " ago")),
 	)
 }
 
