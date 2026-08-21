@@ -102,7 +102,7 @@ If you like quickly navigating with your keyboard, seeing the PRs and issues you
 
 ## 👥 Discord
 
-Have questions? Join our [Discord community](https://discord.gg/SXNXp9NctV)!
+Have questions? Join the original project's [Discord community](https://discord.gg/SXNXp9NctV)!
 
 ## 🙏 Contributing
 
